@@ -150,14 +150,8 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
       <Layout.Content
         style={
           isHome
-            ? { paddingBottom: player.currentSrc ? MINI_BAR_CLEARANCE : 0, width: '100%' }
-            : {
-                padding: '24px 16px',
-                paddingBottom: player.currentSrc ? MINI_BAR_CLEARANCE : 24,
-                maxWidth: 960,
-                margin: '0 auto',
-                width: '100%',
-              }
+            ? { width: '100%' }
+            : { padding: '24px 16px', maxWidth: 960, margin: '0 auto', width: '100%' }
         }
       >
         <Routes>
@@ -166,6 +160,14 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
           <Route path="/book/:bookId/:slug" element={<ChapterPage />} />
         </Routes>
       </Layout.Content>
+      <Layout.Footer
+        style={{
+          textAlign: 'center',
+          paddingBottom: player.currentSrc ? MINI_BAR_CLEARANCE : 24,
+        }}
+      >
+        हरी ॐ
+      </Layout.Footer>
       <MiniBar />
       <NowPlayingOverlay />
     </Layout>

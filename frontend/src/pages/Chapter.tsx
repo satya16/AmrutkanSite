@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Breadcrumb, Button, List, Spin, Typography } from 'antd'
-import { DownloadOutlined } from '@ant-design/icons'
+import { DownloadOutlined, PauseCircleFilled, PlayCircleFilled } from '@ant-design/icons'
 import { fetchLibrary, type Book, type Chapter, type Library } from '../api'
+import { usePlayer } from '../player/PlayerContext'
 
 export default function ChapterPage() {
   const { bookId, slug } = useParams<{ bookId: string; slug: string }>()
   const [library, setLibrary] = useState<Library | null>(null)
+  const player = usePlayer()
 
   useEffect(() => {
     fetchLibrary().then(setLibrary)
@@ -48,17 +50,43 @@ export default function ChapterPage() {
       <List
         bordered
         dataSource={chapter.episodes}
-        renderItem={(episode) => (
-          <List.Item
-            actions={[
-              <a key="dl" href={episode.audioUrl} download={episode.filename} aria-label="डाउनलोड करा">
-                <DownloadOutlined />
-              </a>,
-            ]}
-          >
-            {episode.label}
-          </List.Item>
-        )}
+        renderItem={(episode, index) => {
+          const isCurrent = player.currentSrc === episode.audioUrl
+          return (
+            <List.Item
+              onClick={() =>
+                player.play(episode.audioUrl, episode.label, {
+                  subtitle: `${book.name} · ${chapter.label}`,
+                  playlist: chapter.episodes.map((e) => ({ src: e.audioUrl, label: e.label })),
+                  index,
+                })
+              }
+              style={{ cursor: 'pointer' }}
+              actions={[
+                <a
+                  key="dl"
+                  href={episode.audioUrl}
+                  download={episode.filename}
+                  aria-label="डाउनलोड करा"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <DownloadOutlined />
+                </a>,
+              ]}
+            >
+              <Typography.Text strong={isCurrent}>
+                {isCurrent ? (
+                  player.isPlaying ? (
+                    <PauseCircleFilled style={{ marginRight: 8 }} />
+                  ) : (
+                    <PlayCircleFilled style={{ marginRight: 8 }} />
+                  )
+                ) : null}
+                {episode.label}
+              </Typography.Text>
+            </List.Item>
+          )
+        }}
       />
     </>
   )

@@ -20,9 +20,14 @@ const SLEEP_OPTIONS: { value: 'episode' | number | 'off'; label: string }[] = [
   { value: 'off', label: 'बंद' },
 ]
 
+// iOS-style decelerate easing — same token the original site used for its
+// sheet transitions (now-playing overlay, popups, mini-bar).
+const EASE_SHEET = 'cubic-bezier(0.32, 0.72, 0, 1)'
+
 export default function NowPlayingOverlay() {
   const player = usePlayer()
-  if (!player.overlayOpen || !player.currentSrc) return null
+  if (!player.currentSrc) return null
+  const open = player.overlayOpen
 
   const speedMenu: MenuProps = {
     selectedKeys: [String(player.speed)],
@@ -43,6 +48,7 @@ export default function NowPlayingOverlay() {
 
   return (
     <div
+      aria-hidden={!open}
       style={{
         position: 'fixed',
         inset: 0,
@@ -52,6 +58,9 @@ export default function NowPlayingOverlay() {
         flexDirection: 'column',
         padding: '16px 24px',
         overflowY: 'auto',
+        transform: open ? 'translateY(0)' : 'translateY(100%)',
+        transition: `transform 0.32s ${EASE_SHEET}`,
+        pointerEvents: open ? 'auto' : 'none',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

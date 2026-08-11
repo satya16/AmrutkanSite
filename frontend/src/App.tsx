@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { App as AntApp, Button, ConfigProvider, Layout, Space, Switch, theme as antdTheme, Typography } from 'antd'
+import { App as AntApp, Button, ConfigProvider, Layout, Switch, theme as antdTheme, Typography } from 'antd'
 import { MoonOutlined, ShareAltOutlined, SunOutlined } from '@ant-design/icons'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { useDarkMode } from './useDarkMode'
@@ -130,12 +130,13 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
             अमृतकण
           </Typography.Title>
         </Link>
-        <Space size={4}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <Button
             type="text"
-            icon={<ShareAltOutlined style={{ color: '#fff', fontSize: 18 }} />}
+            icon={<ShareAltOutlined style={{ color: '#fff', fontSize: 16 }} />}
             onClick={handleShare}
             aria-label="Share this page"
+            style={{ width: 22, height: 22, minWidth: 22, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           />
           <Switch
             checked={dark}
@@ -144,7 +145,7 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
             unCheckedChildren={<SunOutlined />}
             aria-label="Toggle dark mode"
           />
-        </Space>
+        </div>
       </Layout.Header>
       <Layout.Content
         style={

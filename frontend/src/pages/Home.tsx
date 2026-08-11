@@ -15,7 +15,7 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section className="home-section" style={{ background, padding: '64px 24px' }}>
+    <section style={{ background, padding: '64px 24px' }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>{children}</div>
     </section>
   )

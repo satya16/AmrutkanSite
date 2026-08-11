@@ -434,6 +434,14 @@ unit).
 tunnel-level logs; this gives an app-level record too. `tail -f
 ~/audio-site/access.log` to watch live traffic.
 
+**`<ip>` is the real visitor IP** (2026-08-11 fix) — every request reaches
+`app.py` via `cloudflared` on localhost, so `self.client_address[0]` is
+always `127.0.0.1` and was being logged as such before this fix. `Cloudflare`
+adds a `CF-Connecting-IP` header with the true visitor IP on every proxied
+request; `log_message` now reads that (falling back to
+`client_address[0]` if it's absent, e.g. hitting `app.py` directly during
+local testing without going through the tunnel).
+
 ## Health check
 
 `~/audio-site/healthcheck.sh`, run every 5 minutes by

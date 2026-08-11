@@ -1,3 +1,4 @@
+import { Progress } from 'antd'
 import { PauseCircleFilled, PlayCircleFilled } from '@ant-design/icons'
 import { usePlayer } from './PlayerContext'
 
@@ -46,9 +47,14 @@ export default function MiniBar() {
         >
           {player.currentLabel}
         </div>
-        <div style={{ height: 3, background: 'rgba(255,255,255,0.2)', borderRadius: 2, marginTop: 4 }}>
-          <div style={{ height: '100%', width: `${pct}%`, background: '#e8935a', borderRadius: 2 }} />
-        </div>
+        <Progress
+          percent={pct}
+          showInfo={false}
+          size="small"
+          strokeColor="#e8935a"
+          trailColor="rgba(255,255,255,0.2)"
+          style={{ marginTop: 4, lineHeight: 0 }}
+        />
       </div>
     </div>
   )

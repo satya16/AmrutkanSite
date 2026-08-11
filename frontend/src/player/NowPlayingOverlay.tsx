@@ -1,8 +1,7 @@
-import { Button, Dropdown, Popover, Slider, Space, Typography } from 'antd'
+import { Button, Drawer, Dropdown, Popover, Slider, Space, Typography } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   DownloadOutlined,
-  DownOutlined,
   PauseCircleFilled,
   PlayCircleFilled,
   QuestionCircleOutlined,
@@ -20,14 +19,9 @@ const SLEEP_OPTIONS: { value: 'episode' | number | 'off'; label: string }[] = [
   { value: 'off', label: 'बंद' },
 ]
 
-// iOS-style decelerate easing — same token the original site used for its
-// sheet transitions (now-playing overlay, popups, mini-bar).
-const EASE_SHEET = 'cubic-bezier(0.32, 0.72, 0, 1)'
-
 export default function NowPlayingOverlay() {
   const player = usePlayer()
   if (!player.currentSrc) return null
-  const open = player.overlayOpen
 
   const speedMenu: MenuProps = {
     selectedKeys: [String(player.speed)],
@@ -47,28 +41,14 @@ export default function NowPlayingOverlay() {
   const filename = decodeURIComponent(player.currentSrc.split('/').pop() || '')
 
   return (
-    <div
-      aria-hidden={!open}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 200,
-        background: 'var(--ant-color-bg-container, #fff)',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '16px 24px',
-        overflowY: 'auto',
-        transform: open ? 'translateY(0)' : 'translateY(100%)',
-        transition: `transform 0.32s ${EASE_SHEET}`,
-        pointerEvents: open ? 'auto' : 'none',
-      }}
+    <Drawer
+      placement="bottom"
+      height="100%"
+      open={player.overlayOpen}
+      onClose={player.closeOverlay}
+      title="आता वाजत आहे"
+      styles={{ body: { display: 'flex', flexDirection: 'column', padding: '16px 24px' } }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Button type="text" icon={<DownOutlined />} onClick={player.closeOverlay} aria-label="Collapse player" />
-        <Typography.Text strong>आता वाजत आहे</Typography.Text>
-        <span style={{ width: 32 }} />
-      </div>
-
       <div style={{ textAlign: 'center', margin: '24px 0' }}>
         <img
           src="/static/mauli.jpg?v=2"
@@ -157,6 +137,6 @@ export default function NowPlayingOverlay() {
           </Popover>
         </Space>
       </div>
-    </div>
+    </Drawer>
   )
 }

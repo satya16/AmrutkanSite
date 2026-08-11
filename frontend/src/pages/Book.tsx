@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Breadcrumb, Button, Card, Col, Row, Typography } from 'antd'
+import { Breadcrumb, Button, Card, Col, Result, Row, Typography } from 'antd'
 import { DownloadOutlined, FolderOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { fetchLibrary, type Book, type Library } from '../api'
 import { toDevanagari } from '../devanagari'
@@ -27,7 +27,17 @@ export default function BookPage() {
 
   const book: Book | undefined = library.books.find((b) => b.id === bookId)
   if (!book) {
-    return <Typography.Paragraph>ग्रंथ सापडला नाही.</Typography.Paragraph>
+    return (
+      <Result
+        status="404"
+        title="ग्रंथ सापडला नाही"
+        extra={
+          <Link to="/">
+            <Button type="primary">मुख्य पानावर जा</Button>
+          </Link>
+        }
+      />
+    )
   }
 
   return (

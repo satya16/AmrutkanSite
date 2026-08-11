@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Breadcrumb, Button, List, Skeleton, Typography } from 'antd'
+import { Breadcrumb, Button, List, Result, Skeleton, Typography } from 'antd'
 import { DownloadOutlined, PauseCircleFilled, PlayCircleFilled } from '@ant-design/icons'
 import { fetchLibrary, type Book, type Chapter, type Library } from '../api'
 import { usePlayer } from '../player/PlayerContext'
@@ -31,7 +31,17 @@ export default function ChapterPage() {
   const book: Book | undefined = library.books.find((b) => b.id === bookId)
   const chapter: Chapter | undefined = book?.chapters.find((c) => c.slug === slug)
   if (!book || !chapter) {
-    return <Typography.Paragraph>भाग सापडला नाही.</Typography.Paragraph>
+    return (
+      <Result
+        status="404"
+        title="भाग सापडला नाही"
+        extra={
+          <Link to="/">
+            <Button type="primary">मुख्य पानावर जा</Button>
+          </Link>
+        }
+      />
+    )
   }
 
   return (

@@ -1436,6 +1436,15 @@ ICON_TRACK = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55A
 
 SITE_DESCRIPTION = "ज्ञानेश्वरी आणि इतर मराठी ग्रंथांचं निरूपण — ध्वनिरूपात ऐका"
 
+GA_MEASUREMENT_ID = "G-KLHSC2QRRW"
+GA_SNIPPET = f"""<script async src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){{dataLayer.push(arguments);}}
+  gtag('js', new Date());
+  gtag('config', '{GA_MEASUREMENT_ID}');
+</script>"""
+
 
 def page_shell(title, body_html, base_url=""):
     og_tags = ""
@@ -1457,6 +1466,7 @@ def page_shell(title, body_html, base_url=""):
 <link rel="icon" href="/static/mauli.jpg?v=2" type="image/jpeg">
 <link rel="apple-touch-icon" href="/static/mauli.jpg?v=2">{og_tags}
 <style>{BASE_CSS}</style>
+{GA_SNIPPET}
 </head>
 <body>
 <div class="topbar">
@@ -1764,6 +1774,25 @@ def build_chapter_zip_items(book_id, slug):
     return f"{chapter_label} - {lib['name']}", items
 
 
+def api_home():
+    """Static home-page content (about text, podcast/YouTube links) as JSON,
+    for the React web frontend — mirrors render_home_main/_youtube/_about."""
+    return {
+        "tagline": "ज्ञानेश्वरी आणि इतर मराठी ग्रंथांचं निरूपण",
+        "siteDescription": SITE_DESCRIPTION,
+        "heroImage": "/static/mauli.jpg?v=2",
+        "aboutText": ABOUT_TEXT_MR,
+        "aboutMePhoto": "/static/sk_chaudhari.jpg",
+        "aboutMeText": "",
+        "podcastLinks": PODCAST_LINKS,
+        "youtube": {
+            "channelUrl": YOUTUBE_CHANNEL_URL,
+            "channelHandle": YOUTUBE_CHANNEL_HANDLE,
+            "videoIds": YOUTUBE_VIDEO_IDS,
+        },
+    }
+
+
 def api_library():
     """Full library tree as JSON, for native clients (e.g. the Android/iOS
     app) that can't scrape the server-rendered HTML the web frontend uses.
@@ -1852,6 +1881,8 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
                 self.serve_audio(parts[1])
             elif parts[0] == "api" and len(parts) == 2 and parts[1] == "library":
                 self.serve_json(api_library())
+            elif parts[0] == "api" and len(parts) == 2 and parts[1] == "home":
+                self.serve_json(api_home())
             elif parts[0] == "download" and len(parts) == 3 and parts[1] == "book":
                 display_name, items = build_book_zip_items(parts[2])
                 self.serve_zip(f"{parts[2]}.zip", f"{display_name}.zip", items)

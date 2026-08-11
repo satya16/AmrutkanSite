@@ -67,7 +67,7 @@ export default function Home() {
 
       {home.podcastLinks.length > 0 && (
         <Card>
-          <Typography.Title level={4}>निरूपण इथेही उपलब्ध</Typography.Title>
+          <Typography.Title level={4} style={{ marginTop: 0 }}>निरूपण इथेही उपलब्ध</Typography.Title>
           <Space size={16} wrap>
             {home.podcastLinks.map((link) => (
               <a
@@ -87,7 +87,7 @@ export default function Home() {
       )}
 
       <Card>
-        <Typography.Title level={4}>यूट्यूब चॅनल</Typography.Title>
+        <Typography.Title level={4} style={{ marginTop: 0 }}>यूट्यूब चॅनल</Typography.Title>
         <Typography.Paragraph>
           <a href={home.youtube.channelUrl} target="_blank" rel="noopener noreferrer">
             {home.youtube.channelHandle} चॅनलला भेट द्या
@@ -109,7 +109,7 @@ export default function Home() {
       </Card>
 
       <Card>
-        <Typography.Title level={4}>आमच्याबद्दल</Typography.Title>
+        <Typography.Title level={4} style={{ marginTop: 0 }}>आमच्याबद्दल</Typography.Title>
         <Typography.Paragraph>{home.aboutText}</Typography.Paragraph>
         <Space align="start" size={16} wrap>
           <img

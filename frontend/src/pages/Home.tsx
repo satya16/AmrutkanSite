@@ -144,14 +144,14 @@ export default function Home() {
           आमच्याबद्दल
         </Typography.Title>
         <Typography.Paragraph>{home.aboutText}</Typography.Paragraph>
-        <Space align="start" size={16} wrap style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginTop: 16 }}>
           <img
             src={home.aboutMePhoto}
             alt="Dr Suresh Kumar Chaudhari"
-            style={{ width: 140, height: 180, objectFit: 'cover', borderRadius: 14 }}
+            style={{ width: 140, height: 180, objectFit: 'cover', borderRadius: 14, flexShrink: 0 }}
           />
-          <Typography.Paragraph style={{ flex: 1, minWidth: 200 }}>{home.aboutMeText}</Typography.Paragraph>
-        </Space>
+          <Typography.Paragraph style={{ flex: 1, minWidth: 0 }}>{home.aboutMeText}</Typography.Paragraph>
+        </div>
       </Section>
     </div>
   )

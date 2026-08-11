@@ -4,9 +4,12 @@ import { Card, Col, Row, Space, Spin, Typography } from 'antd'
 import { fetchHome, fetchLibrary, type HomeContent, type Library } from '../api'
 import { toDevanagari } from '../devanagari'
 
+const MOBILE_UA_RE = /iphone|ipad|ipod|android/i
+
 export default function Home() {
   const [library, setLibrary] = useState<Library | null>(null)
   const [home, setHome] = useState<HomeContent | null>(null)
+  const isMobile = MOBILE_UA_RE.test(navigator.userAgent)
 
   useEffect(() => {
     fetchLibrary().then(setLibrary)
@@ -56,8 +59,7 @@ export default function Home() {
               <a
                 key={link.label}
                 href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
+                {...(isMobile ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
                 style={{ display: 'flex', alignItems: 'center', gap: 8 }}
               >
                 <svg viewBox="0 0 24 24" fill={link.color} width={22} height={22}>

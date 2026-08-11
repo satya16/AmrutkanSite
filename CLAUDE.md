@@ -83,6 +83,29 @@ below for how that's split from the still-dependency-free Python backend.
   books/formats. `app.py` itself doesn't read or serve these tags (it gets
   episode labels from filenames, not ID3/MP4 metadata) — this only matters
   to whoever opens a downloaded file in their own music player.
+- **Traceability tags** (2026-08-11): user was concerned downloaded files
+  wouldn't be traceable back to the site once shared out of context. Added,
+  same one-off `mutagen` script pattern as above:
+  - mp3 (via `EasyID3`): `copyright` = "© 2026 Amrutkan (amrutkan.org)"
+    (`TCOP` frame), `website` = "https://amrutkan.org" (`WOAR` frame — the
+    ID3 frame specifically meant for "official webpage for this audio").
+  - m4a (via `mutagen.mp4.MP4`): `©cmt` (comment) = "© 2026 Amrutkan —
+    https://amrutkan.org", and `cprt` = "© 2026 Amrutkan" — both plain
+    atoms, no `MP4FreeForm` wrapping needed, confirmed working on both the
+    sample test and the full run.
+  - Deliberately **Latin script**, not Devanagari, for these two fields
+    specifically (unlike the rest of the site/tags) — many car
+    stereos/players/OS metadata viewers have weak Devanagari font support,
+    and the whole point of this pass is the text being legibly readable
+    wherever the file ends up, which matters more here than it does for
+    Artist/Album (which most players handle fine either way).
+  - Same verification rigor as the Artist/Album pass: sample pair tested
+    first (duration unchanged, **file size delta was exactly 0 bytes on
+    both samples** — existing ID3/MP4 tag padding absorbed the new fields
+    without needing to resize/shift anything), then the full run (401 mp3 +
+    42 m4a = 443, matching the known total exactly, zero errors), then a
+    12-file random spot check confirming both new fields and the
+    pre-existing Artist/Album tags together.
 
 ## Architecture
 

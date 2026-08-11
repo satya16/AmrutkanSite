@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { ConfigProvider, Layout, Switch, theme as antdTheme, Typography } from 'antd'
 import { MoonOutlined, SunOutlined } from '@ant-design/icons'
-import { Link, Route, Routes } from 'react-router-dom'
+import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { useDarkMode } from './useDarkMode'
 import { PlayerProvider, usePlayer } from './player/PlayerContext'
 import MiniBar from './player/MiniBar'
@@ -31,6 +31,7 @@ export default function App() {
 function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void }) {
   const player = usePlayer()
   const { token } = antdTheme.useToken()
+  const isHome = useLocation().pathname === '/'
 
   // Keep the real <body> background in sync with antd's theme so mobile
   // overscroll/bounce reveals the right color instead of the browser's
@@ -69,13 +70,17 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
         />
       </Layout.Header>
       <Layout.Content
-        style={{
-          padding: '24px 16px',
-          paddingBottom: player.currentSrc ? 80 : 24,
-          maxWidth: 960,
-          margin: '0 auto',
-          width: '100%',
-        }}
+        style={
+          isHome
+            ? { paddingBottom: player.currentSrc ? 80 : 0, width: '100%' }
+            : {
+                padding: '24px 16px',
+                paddingBottom: player.currentSrc ? 80 : 24,
+                maxWidth: 960,
+                margin: '0 auto',
+                width: '100%',
+              }
+        }
       >
         <Routes>
           <Route path="/" element={<Home />} />

@@ -15,10 +15,30 @@ body {
   background-color: rgba(128, 128, 128, 0.12);
 }
 
+/* Home page: gentle section-to-section scroll snap (proximity, not
+   mandatory, so it never fights or traps the user) and a subtle lift on
+   the book tiles to signal they're tappable. */
+html {
+  scroll-snap-type: y proximity;
+}
+.home-section {
+  scroll-snap-align: start;
+}
+.tile-link {
+  display: block;
+  transition: transform 0.2s ease;
+}
+.tile-link:hover {
+  transform: translateY(-4px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+  html {
+    scroll-snap-type: none;
   }
 }

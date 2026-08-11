@@ -49,6 +49,9 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 16px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
         }}
       >
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

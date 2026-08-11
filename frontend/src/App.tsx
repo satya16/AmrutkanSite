@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { ConfigProvider, Layout, Switch, theme as antdTheme, Typography } from 'antd'
 import { MoonOutlined, SunOutlined } from '@ant-design/icons'
 import { Link, Route, Routes } from 'react-router-dom'
@@ -30,6 +31,15 @@ export default function App() {
 
 function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void }) {
   const player = usePlayer()
+  const { token } = antdTheme.useToken()
+
+  // Keep the real <body> background in sync with antd's theme so mobile
+  // overscroll/bounce reveals the right color instead of the browser's
+  // default white beneath the themed Layout.
+  useEffect(() => {
+    document.body.style.background = token.colorBgLayout
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+  }, [token.colorBgLayout, dark])
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

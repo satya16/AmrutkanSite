@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Breadcrumb, Button, Card, Col, Row, Spin, Typography } from 'antd'
+import { Breadcrumb, Button, Card, Col, Row, Typography } from 'antd'
 import { DownloadOutlined, FolderOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { fetchLibrary, type Book, type Library } from '../api'
 import { toDevanagari } from '../devanagari'
@@ -15,9 +15,13 @@ export default function BookPage() {
 
   if (!library) {
     return (
-      <div style={{ textAlign: 'center', padding: 64 }}>
-        <Spin size="large" />
-      </div>
+      <Row gutter={[16, 16]}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Col xs={12} sm={8} md={6} key={i}>
+            <Card loading size="small" />
+          </Col>
+        ))}
+      </Row>
     )
   }
 

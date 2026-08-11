@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Breadcrumb, Button, List, Spin, Typography } from 'antd'
+import { Breadcrumb, Button, List, Skeleton, Typography } from 'antd'
 import { DownloadOutlined, PauseCircleFilled, PlayCircleFilled } from '@ant-design/icons'
 import { fetchLibrary, type Book, type Chapter, type Library } from '../api'
 import { usePlayer } from '../player/PlayerContext'
@@ -16,9 +16,15 @@ export default function ChapterPage() {
 
   if (!library) {
     return (
-      <div style={{ textAlign: 'center', padding: 64 }}>
-        <Spin size="large" />
-      </div>
+      <List
+        bordered
+        dataSource={Array.from({ length: 6 }, (_, i) => i)}
+        renderItem={(i) => (
+          <List.Item key={i}>
+            <Skeleton active title={false} paragraph={{ rows: 1, width: '60%' }} />
+          </List.Item>
+        )}
+      />
     )
   }
 

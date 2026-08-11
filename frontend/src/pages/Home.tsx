@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, Col, Row, Space, Spin, Typography } from 'antd'
+import { Card, Col, Row, Space, Typography } from 'antd'
 import { fetchHome, fetchLibrary, type HomeContent, type Library } from '../api'
 import { toDevanagari } from '../devanagari'
 
@@ -17,10 +17,24 @@ export default function Home() {
   }, [])
 
   if (!library || !home) {
+    // Card's `loading` prop renders a content-shaped skeleton in place of
+    // its children — mirroring the real layout below (hero, book grid,
+    // three more section cards) avoids a layout jump once data arrives.
     return (
-      <div style={{ textAlign: 'center', padding: 64 }}>
-        <Spin size="large" />
-      </div>
+      <Space orientation="vertical" size={32} style={{ width: '100%' }}>
+        <Card loading />
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12}>
+            <Card loading />
+          </Col>
+          <Col xs={24} sm={12}>
+            <Card loading />
+          </Col>
+        </Row>
+        <Card loading />
+        <Card loading />
+        <Card loading />
+      </Space>
     )
   }
 

@@ -602,9 +602,16 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
             pass
 
     def log_message(self, fmt, *args):
+        # Every request arrives from cloudflared on localhost, so
+        # client_address is always 127.0.0.1 — the real visitor IP is in the
+        # CF-Connecting-IP header Cloudflare adds on every proxied request.
+        # self.headers may not be set yet if this fires from a malformed
+        # request that failed to parse, hence the getattr guard.
+        headers = getattr(self, "headers", None)
+        ip = (headers.get("CF-Connecting-IP") if headers else None) or self.client_address[0]
         access_logger.info(
             "%s [%s] %s",
-            self.client_address[0],
+            ip,
             self.log_date_time_string(),
             fmt % args,
         )

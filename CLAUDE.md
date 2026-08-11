@@ -14,10 +14,25 @@ cloudflared tunnel" below. Before this it ran on a temporary, random-hostname
 Cloudflare **quick tunnel**; that phase is over, but earlier notes below
 still mention it for history/context.
 
+**Frontend rewritten as React + antd (2026-08-11)**: the site was originally
+one dependency-free Python file that both served data *and* hand-generated
+all HTML/CSS/JS. At the user's request it now has a proper React frontend
+(TypeScript + Ant Design) instead of hand-rolled markup — see "Architecture"
+below for how that's split from the still-dependency-free Python backend.
+
 ## Files
 
-- `app.py` — the entire application. Single file, **no external dependencies**
-  (see "No pip/venv" below for why).
+- `app.py` — the backend. Still pure Python 3 standard library (`http.server`
+  + `socketserver`), still **no external Python dependencies** at runtime
+  (see "No pip/venv" below for why that constraint exists) — but it no longer
+  renders any page markup itself. It serves data (`/api/library`,
+  `/api/home`), audio (Range-request streaming), ZIP downloads, and the
+  built React app's static assets.
+- `frontend/` — the React + TypeScript + Ant Design (antd) web UI. Built with
+  Vite. **This is the one place Node.js is required**, and only at build
+  time (`npm run build` → `frontend/dist/`) — see "Architecture" below.
+  `frontend/node_modules/` and `frontend/dist/` are gitignored (regenerated,
+  never hand-edited).
 - `static/mauli.jpg` — hero/header image (Dnyaneshwar Mauli), pre-cropped to a
   square, top-anchored, with the original picture-frame border removed.
 - `static/mauli_original.jpg` — the untouched source image, kept in case a
@@ -71,36 +86,28 @@ still mention it for history/context.
 
 ## Architecture
 
-Pure Python 3 standard library (`http.server` + `socketserver`), threaded so
-multiple people can stream concurrently. No Flask/Django — see below for why.
+**Hybrid: Python backend (data + streaming), React frontend (UI).** Node.js
+is a *build-time-only* tool — the running production process is still just
+`python3 app.py`, no Node process in production.
 
-**Content model**: episode filenames follow the pattern
-`<book prefix> - अध्याय <N> ...` or `<book prefix> - ओवी <N> ...`. `build_library()`
-in `app.py` parses this at startup with regex, grouping episodes by book →
-chapter/verse number (Devanagari numerals handled via `to_int`/`to_devanagari`).
-Files that don't match a numbered chapter (intros, summaries, biographies) land
-in an `"other"` bucket per book initially — but per-book `SPECIAL_CHAPTER_ORDER`
-(2026-08-10) pulls specific ones out of that bucket by exact label match and
-gives them their own individually-labelled tile at a fixed position relative
-to the numbered chapters, instead of a generic "इतर" tile:
+**Content model** (`app.py`, unchanged by the React migration): episode
+filenames follow the pattern `<book prefix> - अध्याय <N> ...` or
+`<book prefix> - ओवी <N> ...`. `build_library()` parses this at startup with
+regex, grouping episodes by book → chapter/verse number (Devanagari numerals
+handled via `to_int`/`to_devanagari`). Files that don't match a numbered
+chapter (intros, summaries, biographies) land in an `"other"` bucket per book
+initially — but per-book `SPECIAL_CHAPTER_ORDER` (2026-08-10) pulls specific
+ones out of that bucket by exact label match and gives them their own
+individually-labelled tile at a fixed position relative to the numbered
+chapters, instead of a generic "इतर" tile:
 - **ज्ञानेश्वरी**: परिचय leads (before अध्याय १), सिंहावलोकन trails (after
   अध्याय १८).
 - **चांगदेव पासष्टी**: तीन items all lead (before ओवी १), in this order —
   चांगदेवांचे चरित्र, ज्ञानेश्वरांचे चरित्र, सारांश.
 - If a book has "other" files with labels *not* in its `SPECIAL_CHAPTER_ORDER`
-  config, those still fall back to a generic `"other"`/इतर tile — the config
-  only special-cases the specific labels listed, so this degrades gracefully
-  if a new unrecognized extra file shows up later (restart still needed to
-  pick it up, per usual, but it won't silently vanish — it'll surface as an
-  इतर tile same as before, prompting whoever's maintaining this to add it to
-  the config or leave it there).
+  config, those still fall back to a generic `"other"`/इतर tile.
 - Within each chapter, `सारांश`-prefixed episodes always sort first (before
   श्लोक/ओवी/नमन/etc.) — see the sort key in `build_library()`.
-- Book tiles get a small icon (`ICON_TRACK` vs `ICON_FOLDER` in `app.py`,
-  keyed off episode count == 1) as a subtle visual hint for whether tapping
-  goes to a single track or a multi-episode list. The "N भाग" count badge is
-  suppressed for single-file tiles (`render_book()`) — with the track icon
-  already showing it's one file, "१ भाग" was redundant.
 
 This means **new episodes just need to follow the same filename convention
 and the server restarted** — no code changes needed to pick them up, *unless*
@@ -108,28 +115,75 @@ the new file is a special one-off (like a new intro/summary/biography) that
 should get special positioning, in which case it needs an entry added to
 `SPECIAL_CHAPTER_ORDER`.
 
-**Site structure**: 3-level drill-down — home (2 book cards) → book page (grid
-of chapter/verse tiles) → chapter page (episode list). Feels like a file browser,
-per the user's request.
+**Backend (`app.py`)**:
+- `/api/library` — full book/chapter/episode tree as JSON. Originally built
+  for the native `AmrutkanApp` (Expo/React Native) mobile app; the web
+  frontend now consumes the exact same endpoint.
+- `/api/home` — static home-page content (about text, podcast links, YouTube
+  IDs) as JSON, added 2026-08-11 specifically for the React frontend so that
+  content isn't duplicated between Python and TypeScript.
+- `/audio/<filename>` — HTTP Range-request audio streaming (`serve_audio`).
+- `/download/book/<id>[/<slug>]` — streamed ZIP of a whole book or one
+  chapter (`serve_zip`, `build_book_zip_items`/`build_chapter_zip_items`) —
+  see "Bulk ZIP download" below.
+- `/`, `/book/<id>`, `/book/<id>/<slug>` — **not** rendered server-side
+  anymore. `spa_shell()` generates a minimal HTML shell with per-route
+  `<title>`/`og:*` meta tags (so social link previews keep working — pulled
+  from `LIBRARY` data, no need to fully resolve a page just for its title)
+  plus `<div id="root">` and the built React `<script>` tag. React Router
+  (client-side) takes it from there once the bundle loads. A direct/refreshed
+  load of a deep URL like `/book/dnyaneshwari/1` still works correctly since
+  Python serves the same shell for every one of these routes and React reads
+  the current URL on mount.
+- `/assets/<file>` — serves `frontend/dist/assets/*` (the Vite build's
+  content-hashed JS bundle), long-lived immutable `Cache-Control` since the
+  filename changes whenever the content does. `spa_shell()` doesn't hardcode
+  the hashed filename — it extracts the actual `<script>`/`<link>` tags out
+  of `frontend/dist/index.html` at startup (`_load_frontend_asset_tags()`),
+  so a new `npm run build` output is picked up automatically on the next
+  `app.py` restart with zero code changes.
+- `GA_SNIPPET` — Google Analytics 4 (`G-KLHSC2QRRW`), added 2026-08-11,
+  embedded in every `spa_shell()` response.
 
-**Frontend**: Server-rendered HTML, but navigation is intercepted client-side
-(`GLOBAL_SCRIPT` in `app.py`) — clicking a link does a `fetch()` with an
-`X-Partial: 1` header instead of a full page load; the server responds with just
-the inner content fragment (see `serve_page`/`do_GET`), which replaces `#content`
-via `innerHTML`, plus `history.pushState`. This is what makes the **audio player
-survive navigation** — the `<audio>` element lives in the persistent outer shell
-(`page_shell()`), not inside the part of the page that gets swapped.
+**Frontend (`frontend/src/`)**:
+- Vite + React 19 + TypeScript + Ant Design (antd v6) + `react-router-dom`.
+- `App.tsx` — `ConfigProvider` (theme, incl. dark mode via
+  `theme.darkAlgorithm`/`defaultAlgorithm`), top bar, `Routes` for `/`,
+  `/book/:bookId`, `/book/:bookId/:slug`.
+- `pages/Home.tsx`, `Book.tsx`, `Chapter.tsx` — fetch `/api/library` +
+  `/api/home`, render with antd `Card`/`Row`/`Col`/`List`/`Breadcrumb`.
+  Devanagari-numeral episode counts and the folder-vs-track tile icon
+  (single-episode tiles like परिचय/सिंहावलोकन suppress the redundant "१ भाग"
+  badge) match the original design's behavior. Podcast links skip
+  `target="_blank"` on mobile UA (`navigator.userAgent` regex, client-side
+  now — was server-side `MOBILE_UA_RE` in the old Python implementation) so
+  iOS/Android can hand off to native podcast apps.
+- `player/PlayerContext.tsx` — all player state/logic (play/pause/seek,
+  playlist-aware prev/next, speed presets, sleep timer, MediaSession
+  lock-screen controls, resume-on-reload via `localStorage`). Mounted once at
+  the `App` root (`PlayerProvider` wraps `Routes`, not the other way around)
+  so it survives client-side route navigation — the React equivalent of the
+  old implementation's trick of keeping `<audio>` outside the DOM region that
+  got swapped on navigation. `localStorage` keys (`ak_speed`, `ak_playback`)
+  are unchanged from the old implementation, same shape.
+- `player/MiniBar.tsx` / `NowPlayingOverlay.tsx` — persistent bottom bar +
+  expandable full player UI (seek `Slider`, speed/sleep `Dropdown` menus,
+  download link, help `Popover`).
+- Dev workflow: `cd frontend && npm run dev` (Vite dev server, proxies
+  `/api`, `/audio`, `/static`, `/download` to `python3 app.py` on 8080 — see
+  `vite.config.ts`). Deploy workflow: `cd frontend && npm run build`, then
+  `systemctl --user restart audio-site.service` — **the build step is
+  required**, `app.py` restart alone does not pick up frontend source
+  changes, only a freshly-built `frontend/dist/`.
 
-**Player UI**: fixed bar at the bottom of the screen (mini bar: track name +
-play/pause + thin progress line), tap to expand and reveal native `<audio
-controls>` for seeking/volume. Audio streaming supports HTTP Range requests
-(`serve_audio`) so seeking works.
-
-**Dark mode**: toggle button top-right of the header, preference stored in
-`localStorage`, CSS variables swapped via `[data-theme="dark"]`.
-
-**Mobile**: responsive grid layouts, `env(safe-area-inset-bottom)` padding on
-the player bar for iOS gesture bar clearance, media query at 600px.
+**Known gap vs. the old implementation**: the pre-React version had some
+purely decorative touches — a custom ASCII-art loading skeleton between SPA
+navigations, and a staggered fade-in animation for card/tile grids — that
+were not carried over in the rewrite (out of scope for the approved
+migration plan, which prioritized functional parity: player, dark mode,
+downloads, content). antd's default `Spin` loading state and `Card hoverable`
+interactions cover the baseline UX. Worth adding back only if the user
+actually misses them.
 
 ## Running it
 
@@ -162,6 +216,12 @@ tail -f ~/audio-site/access.log                       # HTTP request log (see "A
 is enough — no more manual pkill/nohup dance, no more "two separate tool calls"
 sandbox quirk (that only applied to the old manual-process workflow). This is
 now safe to do freely — it does **not** change the public URL (see above).
+
+**To deploy after editing anything in `frontend/src/`**: build *first*, then
+restart — `cd frontend && npm run build && cd .. && systemctl --user restart
+audio-site.service`. Restarting without rebuilding just re-serves the
+previous `frontend/dist/` unchanged; the Python process never reads
+`frontend/src/` directly.
 
 **To check it's alive**: `curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/`
 
@@ -270,86 +330,48 @@ Fixed by removing `BindsTo=` so the two units are independent; see "Running
 it" above. Lesson: don't couple a quick-tunnel process's lifecycle to
 anything that restarts more often than the tunnel itself needs to.
 
-## Listener-experience features (added 2026-08-10)
+## Player features (React implementation, `frontend/src/player/`)
 
-All implemented in `app.py`'s `GLOBAL_SCRIPT` (client JS) and `page_shell()`/
-`render_chapter()` (server-rendered markup), no new dependencies:
+Ported 2026-08-11 from the original hand-rolled JS (`GLOBAL_SCRIPT`, now
+deleted from `app.py` — see git history before the React migration commit if
+the old implementation details are ever needed) into `PlayerContext.tsx`.
+Behavior is unchanged from the original design:
 
-- **Lock-screen / Bluetooth controls**: `navigator.mediaSession` — metadata
-  (title/artist/artwork) set in `APP.play()`/`updateMediaSessionMetadata()`,
-  action handlers (play/pause/prev/next/seek) wired in `initMediaSession()`,
-  position synced via `setPositionState` in `updateProgress()`. Untested on a
-  real device from this session — worth confirming lock-screen controls
-  actually show up on both iOS and Android.
-- **Resume where you left off**: `APP.savePlayback()`/`restorePlayback()`
-  persist `{src, label, subtitle, playlist, index, currentTime}` to
-  `localStorage` (key `ak_playback`) — on pause, every ~5s during playback,
-  and on `pagehide`. On load, the player restores to the saved track/position
-  but does **not** autoplay (browser autoplay policies + less surprising UX).
-  The `<audio>` tag has `preload="metadata"` specifically so restoring a
-  saved track on page load doesn't eagerly start downloading the full file
-  before the user actually presses play.
-- **Playback speed ("गती")** and **timer ("टायमर")**: originally cycle-on-tap
-  pills, changed 2026-08-10 to open a bottom-sheet popup instead (per user
-  feedback — a plain "sleep" label with cycling wasn't discoverable/legible in
-  Marathi). `np-speed`/`np-sleep` buttons call `openPopup('speed'|'sleep')`;
-  `#speed-popup`/`#sleep-popup`/`#popup-backdrop` are rendered as **siblings
-  of** (not nested inside) `#now-playing-overlay` specifically to avoid a CSS
-  gotcha — the overlay has a `transform`, which makes it a containing block
-  for `position: fixed` descendants, so a popup nested inside it wouldn't be
-  truly viewport-fixed. Selecting an item calls `setSpeed()`/
-  `setSleepOption()`, which apply the change and call `closePopup()`.
-  - Speed: `SPEED_PRESETS = [0.75, 1, 1.25, 1.5, 1.75, 2]` (ascending order,
-    matches popup list order), persisted in `localStorage` (`ak_speed`),
-    applied via `audio.playbackRate`.
-  - Timer: **defaults to "भाग संपल्यावर"** (`sleepMode: 'episode'` in `APP`'s
-    initial state, not `null`/off) — i.e. out of the box, playback stops when
-    the current episode ends rather than auto-advancing to the next one;
-    listening to more than one episode in a sitting requires explicitly
-    picking "बंद" in the popup. Handled in the `ended` listener via
-    `onEnded()`, which skips `playNext()` and clears the mode instead of
-    auto-advancing when in episode mode. Other options: 15/30/45/60 minutes
-    (wall-clock deadline `Date.now() + N*60000`, checked inside the existing
-    `updateProgress()` tick — no separate `setInterval`), then "बंद" (off).
-    This default (like the rest of the timer state) is intentionally
-    **not** persisted to `localStorage`: a timer set today shouldn't silently
-    reactivate on a later visit.
-- **Download**: every episode row gets a `.dl-btn` (plain `<a download
-  href="/audio/...">`, filename = exact on-disk filename via `html.escape`),
-  plus one in the now-playing overlay (`np-download`) that JS points at
-  whatever's currently loaded. Two things had to be fixed for this to work
-  since the site does SPA-style client-side navigation: (1) the document-level
-  click interceptor that turns internal `<a>` clicks into `fetch()`-based
-  partial navigation now explicitly skips any link with a `download`
-  attribute, otherwise it would `fetch()` the audio file as if it were an
-  HTML fragment; (2) the episode row's own click-to-play handler checks
-  `e.target.closest('.dl-btn')` and bails, so tapping the download icon
-  doesn't also start playback (same pattern already used for the mini-bar's
-  play button).
-- **Favicon + Open Graph tags**: reuses `static/mauli.jpg` directly as both
-  `<link rel="icon">` and `apple-touch-icon` (modern browsers accept JPEG
-  favicons fine, no image conversion tooling needed/available). OG
-  title/description/image are rendered in `page_shell()`; the image and
-  `og:url`-equivalent base URL are derived per-request from the incoming
-  `Host` header (`serve_page` in `AudioHandler`) rather than hardcoded, so it
-  stays correct even though the quick-tunnel hostname changes.
+- **Lock-screen / Bluetooth controls**: `navigator.mediaSession` — metadata,
+  action handlers (play/pause/prev/next/seek), position sync. Registered
+  once in a `useEffect`, reading live state via refs to avoid stale
+  closures. **Still not verified on a real device** — worth confirming on
+  the user's actual iPhone/Android.
+- **Resume where you left off**: `localStorage` key `ak_playback`
+  (`{src, label, subtitle, playlist, index, currentTime}`), saved on pause,
+  every ~5s during playback, and on `pagehide`. Restores track/position on
+  load but does **not** autoplay.
+- **Playback speed** (`SPEED_PRESETS = [0.75, 1, 1.25, 1.5, 1.75, 2]`,
+  `localStorage` key `ak_speed`) and **sleep timer** (episode-end default,
+  or 15/30/45/60 min, or off — timer state intentionally *not* persisted
+  across visits) — both via antd `Dropdown` menus in `NowPlayingOverlay.tsx`,
+  replacing the old bottom-sheet popups.
+- **Download**: plain `<a download href="/audio/...">` per episode and in
+  the overlay — no special click-interception needed anymore (that was only
+  required by the old implementation's manual SPA navigation hijacking;
+  React Router doesn't touch `download`-attribute links).
+- **Favicon + Open Graph tags**: still `static/mauli.jpg` as favicon
+  (`spa_shell()` in `app.py`, not the frontend); OG tags generated
+  server-side per-route so link previews work without needing SSR of the
+  actual React content.
 
 ## Bulk ZIP download (added 2026-08-11)
 
-Every book page (`/book/<id>`) and chapter page (`/book/<id>/<slug>`) now has
-a `.download-all-btn` pill (`page-actions` div, right under the title) that
-downloads the whole book or the whole chapter/verse as a single `.zip` —
-`/download/book/<id>` and `/download/book/<id>/<slug>` in `do_GET`. Like the
-per-episode `.dl-btn`, the link carries a `download` attribute so the
-SPA's document-level click interceptor treats it as a real navigation
-instead of `fetch()`-ing it as an HTML partial.
+Every book page (`/book/<id>`) and chapter page (`/book/<id>/<slug>`) has a
+download-all button that downloads the whole book or the whole chapter/verse
+as a single `.zip` — `/download/book/<id>` and `/download/book/<id>/<slug>`
+in `do_GET`, unchanged by the React migration (backend-only feature).
 
 Implementation lives in `AudioHandler.serve_zip()` plus
 `build_book_zip_items()`/`build_chapter_zip_items()` (resolve book/chapter
-into a `(display_name, [(arcname, filepath), ...])` list, mirroring the
-key/label resolution already done in `render_book`/`render_chapter`). Two
-things make this safe for a book that can be several GB (443 files / ~17GB
-total across both books):
+into a `(display_name, [(arcname, filepath), ...])` list). Two things make
+this safe for a book that can be several GB (443 files / ~17GB total across
+both books):
 - **Never buffered in memory or on disk.** `zipfile.ZipFile` is handed a
   `_NonSeekableWriter` wrapping `self.wfile` directly — a minimal file-like
   object exposing only `write()`/`flush()`, no `tell()`/`seek()`. `ZipFile`
@@ -379,114 +401,6 @@ back clean on both, entries land in per-chapter subfolders for the
 book-level zip (flat for a single-chapter zip, since it's already one
 unit).
 
-## Now-playing icon bug fix (2026-08-11)
-
-`onEnded()` (the `<audio>` `ended` listener) previously relied entirely on
-the browser also firing a `pause` event before `ended` (per spec it should,
-and usually does) to flip the mini-bar/overlay icon back to play and reset
-`navigator.mediaSession.playbackState`. Reported symptom: after minimizing
-the now-playing overlay and navigating elsewhere in the SPA while the
-current track played out to the end, the pause icon stayed showing instead
-of reverting to play. `onEnded()` now explicitly calls
-`this.updatePlayIcon(false)` and resets `this.audio.currentTime = 0` itself
-at the top, rather than depending on that implicit `pause` event — belt and
-suspenders, and it also means tapping play again after natural end-of-track
-restarts the same episode from the beginning instead of doing nothing
-(currentTime was previously left sitting at `duration`). When `onEnded()`
-does go on to call `playNext()`, the explicit reset is harmless/moot since
-`play()` immediately assigns a new `src` for the next track anyway.
-
-## Card-based home page (added 2026-08-11)
-
-The home page (`/`) is now three stacked full-panel "card" sections instead
-of one continuous page, built by `render_home()` calling three helpers —
-`render_home_main()` (unchanged hero + book grid + podcast footer, now just
-additionally wrapped in a `.section-card` panel for visual consistency with
-the two new sections below it), `render_home_youtube()`, and
-`render_home_about()` — each wrapped in `<section class="home-section">`,
-all inside one `<div class="home-scroll">`. CSS (`scroll-snap-type: y
-proximity` on `.home-scroll`, `scroll-snap-align: start` on `.home-section`)
-gives a gentle snap-to-section feel while scrolling without trapping the
-user the way `mandatory` snapping can on variable-height content (chosen
-deliberately over `mandatory` for that reason); disabled entirely under
-`prefers-reduced-motion: reduce`, consistent with the rest of the site's
-motion-reduction handling.
-
-- **YouTube section**: channel link (`YOUTUBE_CHANNEL_URL`/
-  `YOUTUBE_CHANNEL_HANDLE` constants — handle is `@अमृतकण`) plus two embedded
-  videos (`YOUTUBE_VIDEO_IDS`) via `youtube-nocookie.com/embed/<id>` iframes
-  (privacy-enhanced mode, no tracking cookies until playback starts),
-  `loading="lazy"` so they don't eagerly load until scrolled near. Icon path
-  + brand red (`#FF0000`) sourced from simple-icons, same convention as
-  `PODCAST_LINKS`.
-- **About section**: `ABOUT_TEXT_MR` is a placeholder Marathi translation of
-  copy the user gave in English — content is explicitly not final (user said
-  it's "still being decided"), so expect this to be replaced wholesale
-  later; don't build anything else on top of this text being stable.
-  - **"माझ्याबद्दल" subsection** (added 2026-08-11): sits at the bottom of
-    this same card, below a divider (`.about-me`) — a photo of Dr Suresh
-    Kumar Chaudhari (`static/sk_chaudhari.jpg`, downloaded from an ITU
-    profile page the user linked, not hotlinked) on the left and an
-    intentionally **empty** `.about-me-text` div on the right
-    (`.about-me-row`, flex; stacks to photo-above-text on mobile via the
-    existing `@media (max-width: 600px)` block). The user explicitly asked
-    for the text to stay blank for now — don't fill it with placeholder
-    copy, that's content to be written later.
-- Both new sections reuse the `.section-card`/`.section-title`/
-  `.section-lead` classes, generic enough to be reused for further home
-  sections if more get added later.
-- Not visually verified in a real browser this session (no browser
-  automation tool connected) — checked by inspecting the rendered HTML
-  structure (balanced tags, correct section/card nesting, right video IDs
-  and Marathi text present) and confirming both `localhost:8080` and
-  `https://amrutkan.org` return it. Worth an actual look in a browser to
-  confirm the snap-scroll feel and iframe sizing look right, especially on
-  mobile.
-
-## Motion polish + loading skeleton (added 2026-08-10)
-
-- **Sheet transitions**: the now-playing overlay, mini-bar, and the three
-  bottom-sheet popups (गती/टायमर/मदत) all share one easing token,
-  `--ease-sheet: cubic-bezier(0.32, 0.72, 0, 1)` (iOS-style decelerate), set
-  once in `:root`.
-- **Loading skeleton on SPA navigation**: `navigateTo()` now shows a
-  placeholder while the `fetch()` for the next page is in flight, instead of
-  leaving the old page visible with no feedback until data arrives —
-  folded-hands **ASCII art** (not emoji — deliberately, since this is a
-  religious site) inside a rotating ring (`.skeleton-ring::before`, a halo-like
-  CSS spinner), plus "हरी ॐ" and "थोडा वेळ थांबा…" beneath it. The first
-  version of the hands (just a tapering diamond, no finger strokes) read as a
-  heart rather than praying hands per user feedback (2026-08-10) — fixed by
-  prepending a `||  ||` "fingers" row above the taper (`SKELETON_HANDS_RAW`),
-  since shape alone was too ambiguous at ASCII-art resolution without some
-  cue that specifically reads as fingers rather than a generic curve. The
-  ASCII art is authored once as a raw Python string, then run through
-  `json.dumps()` and spliced into `GLOBAL_SCRIPT` via a
-  `__SKELETON_HANDS_JSON__` placeholder + `.replace()` — deliberately
-  avoiding hand-escaping backslashes through two string layers (Python source
-  → JS source), which is exactly the kind of thing that's easy to get subtly
-  wrong. `navigateTo()` also gained a `try/catch` around the `fetch()` (falls
-  back to a full `location.href` navigation) — without it, a network failure
-  mid-navigation would leave the skeleton stuck on screen forever with no
-  recovery, which defeats the point of adding it on a site whose whole
-  context is flaky connections.
-- **Staggered entrance** for `.book-card`/`.tile`/`li.track` grids: these
-  start at `opacity: 0` in CSS, and only become visible when JS
-  (`applyStagger()`, called at the end of `bindContent()`) sets a per-item
-  `animation-delay` (capped at index 10 so long episode lists don't take
-  forever to finish revealing) and adds a `.stagger-in` class that triggers
-  the actual keyframe animation. This ordering is deliberate, not
-  cosmetic — if the CSS `animation` were applied directly on the base
-  selector instead, it would start playing (with a uniform zero delay, i.e.
-  no stagger at all) as soon as the browser parses the elements, which for
-  the very first page load happens before `bindContent()`'s JS has a chance
-  to run and set the per-item delays. `bindContent()` runs on both the first
-  page load (via `APP.init()` on `DOMContentLoaded`) and every SPA
-  navigation, so the stagger works consistently in both cases.
-- `prefers-reduced-motion: reduce` disables all of the above (including
-  forcing the grid items back to `opacity: 1` so reduced-motion users don't
-  end up with permanently invisible content).
-
 ## Access log
 
 `log_message` on `AudioHandler` used to be a no-op. It now writes to
@@ -502,34 +416,34 @@ tunnel-level logs; this gives an app-level record too. `tail -f
 `~/audio-site/healthcheck.sh`, run every 5 minutes by
 `audio-site-healthcheck.timer` (systemd user timer, `OnBootSec=2min
 OnUnitActiveSec=5min Persistent=true`). Each run: curls `localhost:8080`
-(is `app.py` up), reads the current tunnel URL out of
-`journalctl --user -u audio-site-tunnel.service` and curls *that* (is the
-whole path — app + tunnel + Cloudflare edge — actually reachable), with one
-retry after 5s to avoid flagging sub-5-second blips. State (`healthy`/
-`unhealthy`) is tracked in `~/audio-site/.healthcheck_state`; a **transition**
-(not every check) triggers a `notify-send` desktop notification — critical
-urgency + reason when it goes down, a plain notification with the current URL
-when it recovers. First-ever run never notifies (nothing to "recover" from).
+(is `app.py` up) and `https://amrutkan.org` (is the whole path — app +
+tunnel + Cloudflare edge — actually reachable), with one retry after 5s to
+avoid flagging sub-5-second blips. State (`healthy`/`unhealthy`) is tracked
+in `~/audio-site/.healthcheck_state`; a **transition** (not every check)
+triggers a `notify-send` desktop notification — critical urgency + reason
+when it goes down, a plain notification with the current URL when it
+recovers. First-ever run never notifies (nothing to "recover" from).
 Notification delivery depends on the user being logged into the graphical
-Wayland session on this machine (confirmed present and working when this was
-set up) — there's no email/push fallback, so if the laptop is logged out this
-degrades to log-only (`~/audio-site/healthcheck.log`). Tested end-to-end by
-stopping `audio-site.service` and confirming both the down and back-up
-notifications fired correctly.
+Wayland session on this machine — there's no email/push fallback, so if the
+laptop is logged out this degrades to log-only (`~/audio-site/healthcheck.log`).
 
 ## Known constraints for whoever continues this
 
 - **No pip/venv available** in this environment: `python3-pip` and `python3-venv`
   aren't installed, and `sudo` requires interactive auth that isn't available in
   this session (no passwordless sudo). This is why `app.py` deliberately avoids
-  Flask/any third-party package — stick to stdlib unless the user installs pip
-  themselves (`sudo apt install python3-pip python3-venv`, which they'd need to
-  run themselves via `!` in a Claude Code session, or the environment changes).
-  `python3-mutagen` is an exception — the user installed it via `sudo
-  apt` (2026-08-11, interactively, see below) for one-off audio-tag editing,
-  so it's actually importable now. That's still an apt package, not pip —
-  general third-party dependencies for `app.py` itself remain off the table
-  under this constraint.
+  Flask/any third-party **Python** package — stick to stdlib unless the user
+  installs pip themselves (`sudo apt install python3-pip python3-venv`, which
+  they'd need to run themselves via `!` in a Claude Code session, or the
+  environment changes). `python3-mutagen` is an exception — the user installed
+  it via `sudo apt` (2026-08-11, interactively) for one-off audio-tag editing.
+  That's still an apt package, not pip — general third-party Python
+  dependencies for `app.py` itself remain off the table under this constraint.
+  This does **not** apply to the frontend — `frontend/` has its own Node/npm
+  toolchain (already installed via nvm) and normal npm dependencies (React,
+  antd, etc.) are expected and fine there; the "no dependencies" constraint
+  was always specifically about keeping the *Python runtime process* simple,
+  not about the build tooling.
 - **Sandbox quirk with `pkill`**: running `pkill` in the same Bash tool call as
   a follow-up command (e.g. `pkill ...; nohup ...`) reliably produces a strange
   exit code (144) and the rest of that command block silently doesn't run, even
@@ -546,14 +460,15 @@ notifications fired correctly.
 ## Possible next steps (not yet done, only do if asked)
 
 - Confirm lock-screen/Bluetooth media controls actually work on the user's
-  real iPhone/Android — implemented 2026-08-10 but never visually verified
-  (no browser tooling available in that session).
-
-- ~~Systemd user services for `app.py` and `cloudflared` so both survive reboots.~~
-  Done 2026-08-10, see "Running it" above.
-- ~~Switch to a named Cloudflare Tunnel + purchased domain.~~ Done 2026-08-11
-  — site is now on `https://amrutkan.org` via a named tunnel, see "The
-  cloudflared tunnel" above.
+  real iPhone/Android — implemented 2026-08-10, ported to React 2026-08-11,
+  still never visually verified on a real device.
+- Consider code-splitting the frontend bundle — `npm run build` currently
+  warns about a single ~770KB JS chunk (mostly antd). Not urgent for a
+  low-traffic hobby site, but worth revisiting if load time ever matters.
+- Optional polish: the pre-React implementation had a custom loading
+  skeleton and staggered card-entrance animation that weren't carried over
+  in the rewrite (see "Known gap" in Architecture above) — only worth doing
+  if the user actually wants that motion polish back.
 - Prefer wired ethernet (`enp1s0f0`) over WiFi for this machine if practical —
   WiFi disconnect/reassociate events have been observed to kill the tunnel
   mid-stream (see 2026-08-10 investigation above).

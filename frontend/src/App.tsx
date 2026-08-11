@@ -9,8 +9,7 @@ import NowPlayingOverlay from './player/NowPlayingOverlay'
 import Home from './pages/Home'
 import BookPage from './pages/Book'
 import ChapterPage from './pages/Chapter'
-
-const ACCENT = '#b5541a'
+import { ACCENT } from './theme'
 
 export default function App() {
   const [dark, toggleDark] = useDarkMode()

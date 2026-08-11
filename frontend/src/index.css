@@ -8,6 +8,13 @@ body {
   min-height: 100vh;
 }
 
+.episode-item {
+  transition: background-color 0.15s ease;
+}
+.episode-item:hover {
+  background-color: rgba(128, 128, 128, 0.12);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Breadcrumb, Button, List, Result, Skeleton, Typography } from 'antd'
-import { DownloadOutlined, PauseCircleFilled, PlayCircleFilled } from '@ant-design/icons'
+import { DownloadOutlined, PauseCircleFilled, PlayCircleFilled, PlayCircleOutlined } from '@ant-design/icons'
 import { fetchLibrary, type Book, type Chapter, type Library } from '../api'
 import { usePlayer } from '../player/PlayerContext'
+import { ACCENT } from '../theme'
 
 export default function ChapterPage() {
   const { bookId, slug } = useParams<{ bookId: string; slug: string }>()
@@ -68,8 +69,18 @@ export default function ChapterPage() {
         dataSource={chapter.episodes}
         renderItem={(episode, index) => {
           const isCurrent = player.currentSrc === episode.audioUrl
+          const playIcon = isCurrent ? (
+            player.isPlaying ? (
+              <PauseCircleFilled style={{ fontSize: 22, color: ACCENT }} />
+            ) : (
+              <PlayCircleFilled style={{ fontSize: 22, color: ACCENT }} />
+            )
+          ) : (
+            <PlayCircleOutlined style={{ fontSize: 22, color: ACCENT }} />
+          )
           return (
             <List.Item
+              className="episode-item"
               onClick={() =>
                 player.play(episode.audioUrl, episode.label, {
                   subtitle: `${book.name} · ${chapter.label}`,
@@ -90,16 +101,10 @@ export default function ChapterPage() {
                 </a>,
               ]}
             >
-              <Typography.Text strong={isCurrent}>
-                {isCurrent ? (
-                  player.isPlaying ? (
-                    <PauseCircleFilled style={{ marginRight: 8 }} />
-                  ) : (
-                    <PlayCircleFilled style={{ marginRight: 8 }} />
-                  )
-                ) : null}
-                {episode.label}
-              </Typography.Text>
+              <List.Item.Meta
+                avatar={playIcon}
+                title={<Typography.Text strong={isCurrent}>{episode.label}</Typography.Text>}
+              />
             </List.Item>
           )
         }}

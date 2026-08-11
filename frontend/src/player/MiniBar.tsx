@@ -1,5 +1,5 @@
 import { Progress } from 'antd'
-import { PauseCircleFilled, PlayCircleFilled } from '@ant-design/icons'
+import { CloseOutlined, PauseCircleFilled, PlayCircleFilled } from '@ant-design/icons'
 import { usePlayer } from './PlayerContext'
 
 export default function MiniBar() {
@@ -22,7 +22,7 @@ export default function MiniBar() {
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        padding: '8px 16px',
+        padding: '8px 16px calc(8px + env(safe-area-inset-bottom))',
         cursor: 'pointer',
       }}
     >
@@ -56,6 +56,16 @@ export default function MiniBar() {
           style={{ marginTop: 4, lineHeight: 0 }}
         />
       </div>
+      <span
+        onClick={(e) => {
+          e.stopPropagation()
+          player.stop()
+        }}
+        style={{ fontSize: 18, display: 'flex', color: '#fff', opacity: 0.75 }}
+        aria-label="Close player"
+      >
+        <CloseOutlined />
+      </span>
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { Button, Drawer, Dropdown, Popover, Slider, Space, Typography } from 'an
 import type { MenuProps } from 'antd'
 import {
   DownloadOutlined,
+  DownOutlined,
   PauseCircleFilled,
   PlayCircleFilled,
   QuestionCircleOutlined,
@@ -46,7 +47,16 @@ export default function NowPlayingOverlay() {
       height="100%"
       open={player.overlayOpen}
       onClose={player.closeOverlay}
+      closable={false}
       title="आता वाजत आहे"
+      extra={
+        <Button
+          type="text"
+          icon={<DownOutlined />}
+          onClick={player.closeOverlay}
+          aria-label="Minimize player"
+        />
+      }
       styles={{ body: { display: 'flex', flexDirection: 'column', padding: '16px 24px' } }}
     >
       <div style={{ textAlign: 'center', margin: '24px 0' }}>

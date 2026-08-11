@@ -52,6 +52,7 @@ interface PlayerContextValue extends PlaySnapshot {
   setSleepOption: (value: 'off' | 'episode' | number) => void
   openOverlay: () => void
   closeOverlay: () => void
+  stop: () => void
   sleepLabel: string
 }
 
@@ -205,6 +206,34 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     update({ overlayOpen: true })
   }, [update])
   const closeOverlay = useCallback(() => update({ overlayOpen: false }), [update])
+
+  const stop = useCallback(() => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+    }
+    sleepEndAtRef.current = 0
+    localStorage.removeItem(PLAYBACK_KEY)
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = null
+      navigator.mediaSession.playbackState = 'none'
+    }
+    update({
+      currentSrc: null,
+      currentLabel: '',
+      subtitle: '',
+      playlist: null,
+      currentIndex: -1,
+      isPlaying: false,
+      currentTime: 0,
+      duration: 0,
+      sleepMode: 'episode',
+      sleepRemainingMin: null,
+      overlayOpen: false,
+    })
+  }, [update])
 
   // Wire up the <audio> element's events once.
   useEffect(() => {
@@ -360,6 +389,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setSleepOption,
     openOverlay,
     closeOverlay,
+    stop,
     sleepLabel,
   }
 

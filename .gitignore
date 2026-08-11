@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+access.log
+app.log
+healthcheck.log
+.healthcheck_state
+frontend/node_modules/
+frontend/dist/

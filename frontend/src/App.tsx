@@ -16,6 +16,36 @@ import { ACCENT } from './theme'
 // home-indicator safe area (0 on devices/browsers without one).
 const MINI_BAR_CLEARANCE = 'calc(96px + env(safe-area-inset-bottom))'
 
+// Some in-app browsers (WhatsApp/Instagram/Facebook's built-in webview,
+// common for a site shared mostly via chat links) restrict or omit both
+// navigator.share and the modern Clipboard API. document.execCommand is
+// deprecated but still works in far more of those restricted contexts, so
+// it's a worthwhile second-chance fallback before giving up entirely.
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // fall through to the legacy method below
+    }
+  }
+  try {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return ok
+  } catch {
+    return false
+  }
+}
+
 export default function App() {
   const [dark, toggleDark] = useDarkMode()
 
@@ -38,7 +68,7 @@ export default function App() {
 function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void }) {
   const player = usePlayer()
   const { token } = antdTheme.useToken()
-  const { message } = AntApp.useApp()
+  const { message, modal } = AntApp.useApp()
   const isHome = useLocation().pathname === '/'
 
   // Keep the real <body> background in sync with antd's theme so mobile
@@ -59,12 +89,22 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
       }
       return
     }
-    try {
-      await navigator.clipboard.writeText(shareData.url)
+    if (await copyToClipboard(shareData.url)) {
       message.success('लिंक कॉपी केली')
-    } catch {
-      message.error('लिंक कॉपी करता आली नाही')
+      return
     }
+    // Both the Clipboard API and the execCommand fallback were blocked
+    // (common in some in-app browsers) — show the link as selectable text
+    // so the user can still copy it by hand. This always works.
+    modal.info({
+      title: 'लिंक शेअर करा',
+      content: (
+        <Typography.Paragraph copyable={{ text: shareData.url }} style={{ wordBreak: 'break-all', marginBottom: 0 }}>
+          {shareData.url}
+        </Typography.Paragraph>
+      ),
+      okText: 'ठीक आहे',
+    })
   }
 
   return (

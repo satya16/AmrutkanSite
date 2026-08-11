@@ -2,7 +2,7 @@ import { Button, Drawer, Dropdown, Popover, Slider, Space, Typography } from 'an
 import type { MenuProps } from 'antd'
 import {
   DownloadOutlined,
-  DownOutlined,
+  MinusOutlined,
   PauseCircleFilled,
   PlayCircleFilled,
   QuestionCircleOutlined,
@@ -52,7 +52,7 @@ export default function NowPlayingOverlay() {
       extra={
         <Button
           type="text"
-          icon={<DownOutlined />}
+          icon={<MinusOutlined />}
           onClick={player.closeOverlay}
           aria-label="Minimize player"
         />

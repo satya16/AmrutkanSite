@@ -144,13 +144,24 @@ export default function Home() {
           आमच्याबद्दल
         </Typography.Title>
         <Typography.Paragraph>{home.aboutText}</Typography.Paragraph>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginTop: 16 }}>
+        {/* display: flow-root (not overflow: hidden) so the container
+            properly contains the floated image without any risk of
+            clipping — the modern, side-effect-free way to contain a float. */}
+        <div style={{ marginTop: 16, display: 'flow-root' }}>
           <img
             src={home.aboutMePhoto}
             alt="Dr Suresh Kumar Chaudhari"
-            style={{ width: 140, height: 180, objectFit: 'cover', borderRadius: 14, flexShrink: 0 }}
+            style={{
+              width: 140,
+              height: 180,
+              objectFit: 'cover',
+              borderRadius: 14,
+              float: 'left',
+              marginRight: 16,
+              marginBottom: 8,
+            }}
           />
-          <Typography.Paragraph style={{ flex: 1, minWidth: 0 }}>{home.aboutMeText}</Typography.Paragraph>
+          <Typography.Paragraph>{home.aboutMeText}</Typography.Paragraph>
         </div>
       </Section>
     </div>

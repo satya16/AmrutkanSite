@@ -8,6 +8,10 @@ import json
 import logging
 import zipfile
 import gzip
+import smtplib
+import threading
+import time
+from email.message import EmailMessage
 from logging.handlers import RotatingFileHandler
 
 AUDIO_DIR = os.path.expanduser("~/Desktop/अमृतकण")
@@ -18,6 +22,21 @@ ACCESS_LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "acce
 PORT = 8080
 CHUNK_SIZE = 64 * 1024
 PRIMARY_DOMAIN = "amrutkan.org"
+
+# Feedback form (web + app) -> email, via Gmail SMTP with an App Password.
+# Deliberately read from the environment (systemd EnvironmentFile), never
+# hardcoded/committed — see ~/audio-site/.env.feedback (gitignored).
+FEEDBACK_SMTP_USER = os.environ.get("FEEDBACK_SMTP_USER", "")
+FEEDBACK_SMTP_APP_PASSWORD = os.environ.get("FEEDBACK_SMTP_APP_PASSWORD", "")
+FEEDBACK_TO_EMAIL = os.environ.get("FEEDBACK_TO_EMAIL", "")
+FEEDBACK_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+FEEDBACK_MAX_MESSAGE_LEN = 3000
+FEEDBACK_MAX_CONTACT_LEN = 200
+FEEDBACK_RATE_LIMIT = 5
+FEEDBACK_RATE_WINDOW_SEC = 3600
+
+_feedback_lock = threading.Lock()
+_feedback_history = {}  # ip -> [timestamp, ...] of recent accepted submissions
 
 access_logger = logging.getLogger("audio_site.access")
 access_logger.setLevel(logging.INFO)
@@ -481,6 +500,43 @@ def api_library():
     return {"books": books, "artworkUrl": "/static/mauli.jpg?v=2"}
 
 
+def feedback_rate_limit_ok(ip):
+    """Simple in-memory per-IP sliding-window limiter (single process, so a
+    plain dict + lock is enough — no need for anything shared/persistent)."""
+    now = time.time()
+    with _feedback_lock:
+        recent = [t for t in _feedback_history.get(ip, []) if now - t < FEEDBACK_RATE_WINDOW_SEC]
+        if len(recent) >= FEEDBACK_RATE_LIMIT:
+            _feedback_history[ip] = recent
+            return False
+        recent.append(now)
+        _feedback_history[ip] = recent
+        return True
+
+
+def send_feedback_email(message, contact, source, ip):
+    if not (FEEDBACK_SMTP_USER and FEEDBACK_SMTP_APP_PASSWORD and FEEDBACK_TO_EMAIL):
+        logging.getLogger("audio_site").warning("Feedback received but SMTP is not configured — dropped")
+        return False
+    msg = EmailMessage()
+    msg["Subject"] = f"Amrutkan feedback ({source})"
+    msg["From"] = FEEDBACK_SMTP_USER
+    msg["To"] = FEEDBACK_TO_EMAIL
+    if contact and FEEDBACK_EMAIL_RE.match(contact):
+        msg["Reply-To"] = contact
+    msg.set_content(
+        f"Source: {source}\nIP: {ip}\nContact: {contact or '(not provided)'}\n\n{message}"
+    )
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as smtp:
+            smtp.login(FEEDBACK_SMTP_USER, FEEDBACK_SMTP_APP_PASSWORD)
+            smtp.send_message(msg)
+        return True
+    except (smtplib.SMTPException, OSError):
+        logging.getLogger("audio_site").exception("Failed to send feedback email")
+        return False
+
+
 class _NonSeekableWriter:
     """Wraps the response socket's file object so zipfile.ZipFile streams
     straight through it instead of buffering: ZipFile falls back to writing
@@ -561,6 +617,64 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
                 self.send_error(404)
         except LookupError:
             self.send_error(404)
+
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        parts = [p for p in urllib.parse.unquote(parsed.path).split("/") if p]
+        if parts == ["api", "feedback"]:
+            self.handle_feedback()
+        else:
+            self.send_error(404)
+
+    def get_client_ip(self):
+        return self.headers.get("CF-Connecting-IP") or self.client_address[0]
+
+    def handle_feedback(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        if length <= 0 or length > 8192:
+            self.send_json_error(400, "अवैध विनंती")
+            return
+        try:
+            data = json.loads(self.rfile.read(length).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self.send_json_error(400, "अवैध विनंती")
+            return
+
+        # Honeypot: a field real users never see or fill in. Bots that fill
+        # every field trip it; respond as if it succeeded either way so they
+        # don't learn to avoid it, but skip the actual email.
+        if str(data.get("website", "")).strip():
+            self.serve_json({"ok": True})
+            return
+
+        message = str(data.get("message", "")).strip()
+        contact = " ".join(str(data.get("contact", "")).split())
+        source = data.get("source") if data.get("source") in ("web", "app") else "web"
+
+        if not message or len(message) > FEEDBACK_MAX_MESSAGE_LEN:
+            self.send_json_error(400, "संदेश रिकामा किंवा खूप मोठा आहे")
+            return
+        if len(contact) > FEEDBACK_MAX_CONTACT_LEN:
+            self.send_json_error(400, "संपर्क माहिती खूप मोठी आहे")
+            return
+
+        ip = self.get_client_ip()
+        if not feedback_rate_limit_ok(ip):
+            self.send_json_error(429, "खूप विनंत्या झाल्या, कृपया नंतर प्रयत्न करा")
+            return
+
+        if not send_feedback_email(message, contact, source, ip):
+            self.send_json_error(503, "संदेश पाठवता आला नाही, कृपया नंतर प्रयत्न करा")
+            return
+        self.serve_json({"ok": True})
+
+    def send_json_error(self, status, error_message):
+        body = json.dumps({"ok": False, "error": error_message}, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def serve_spa_page(self, title):
         host = self.headers.get("Host", "")
@@ -753,8 +867,7 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
         # CF-Connecting-IP header Cloudflare adds on every proxied request.
         # self.headers may not be set yet if this fires from a malformed
         # request that failed to parse, hence the getattr guard.
-        headers = getattr(self, "headers", None)
-        ip = (headers.get("CF-Connecting-IP") if headers else None) or self.client_address[0]
+        ip = self.get_client_ip() if getattr(self, "headers", None) else self.client_address[0]
         access_logger.info(
             "%s [%s] %s",
             ip,

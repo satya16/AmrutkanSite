@@ -9,6 +9,7 @@ import NowPlayingOverlay from './player/NowPlayingOverlay'
 import Home from './pages/Home'
 import BookPage from './pages/Book'
 import ChapterPage from './pages/Chapter'
+import FeedbackButton from './components/FeedbackButton'
 import { ACCENT } from './theme'
 
 // Reserved space below page content when the mini-bar is showing — taller
@@ -131,6 +132,7 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
           </Typography.Title>
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <FeedbackButton />
           <Button
             type="text"
             icon={<ShareAltOutlined style={{ color: '#fff', fontSize: 16 }} />}

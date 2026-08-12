@@ -55,3 +55,23 @@ async function getJSON<T>(url: string): Promise<T> {
 
 export const fetchLibrary = () => getJSON<Library>('/api/library')
 export const fetchHome = () => getJSON<HomeContent>('/api/home')
+
+export interface FeedbackPayload {
+  message: string
+  contact: string
+  // Honeypot — real users never see this field; bots that fill in every
+  // field trip it. Always sent empty by the actual form.
+  website: string
+}
+
+export async function submitFeedback(payload: FeedbackPayload): Promise<void> {
+  const res = await fetch('/api/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...payload, source: 'web' }),
+  })
+  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || `feedback -> ${res.status}`)
+  }
+}

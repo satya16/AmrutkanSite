@@ -6,7 +6,8 @@ export default function MiniBar() {
   const player = usePlayer()
   if (!player.currentSrc) return null
 
-  const pct = player.duration ? (player.currentTime / player.duration) * 100 : 0
+  const playedPct = player.duration ? (player.currentTime / player.duration) * 100 : 0
+  const bufferedPct = player.duration ? (player.buffered / player.duration) * 100 : 0
 
   return (
     <div
@@ -47,12 +48,17 @@ export default function MiniBar() {
         >
           {player.currentLabel}
         </div>
+        {/* percent (buffered, lighter) is the outer bar; success.percent (played,
+            full accent) overlays it — same "how much has loaded" idea as the
+            full player's seek bar, via antd's built-in two-segment Progress
+            instead of a hand-rolled gradient. */}
         <Progress
-          percent={pct}
+          percent={bufferedPct}
+          success={{ percent: playedPct, strokeColor: '#e8935a' }}
           showInfo={false}
           size="small"
-          strokeColor="#e8935a"
-          trailColor="rgba(255,255,255,0.2)"
+          strokeColor="rgba(255,255,255,0.35)"
+          trailColor="rgba(255,255,255,0.15)"
           style={{ marginTop: 4, lineHeight: 0 }}
         />
       </div>

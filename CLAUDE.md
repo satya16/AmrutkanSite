@@ -43,6 +43,9 @@ below for how that's split from the still-dependency-free Python backend.
 - `healthcheck.sh` — see "Health check" below. `access.log`, `healthcheck.log`,
   `.healthcheck_state` are runtime-generated (not checked into anything, just
   local state/logs).
+- `build_zip_cache.py` — one-off script, pre-builds `zip-cache/` (gitignored,
+  ~34GB, not checked in) — see "ZIP cache" under "Bulk ZIP download" below.
+  Re-run manually whenever audio content changes.
 - Audio content itself is **not** in this folder — it's read directly from
   `~/Desktop/अमृतकण` (see `AUDIO_DIR` in `app.py`). 443 files (401 `.mp3` +
   42 `.m4a`), ~17GB total. **Physically arranged on disk to mirror both the
@@ -423,6 +426,66 @@ against a throwaway instance on a scratch port, `zipfile.testzip()` came
 back clean on both, entries land in per-chapter subfolders for the
 book-level zip (flat for a single-chapter zip, since it's already one
 unit).
+
+### ZIP cache — real file sizes shown during download (added 2026-08-11)
+
+Users couldn't see download size/progress for ZIPs (unlike individual
+episode downloads, which already sent a real `Content-Length` — see
+`serve_audio`) because `serve_zip()` above deliberately never knows the
+total size upfront. Fix: `build_zip_cache.py` (repo root, one-off script,
+same pattern as the ID3-tagging scripts) pre-builds *every* book and
+chapter ZIP — 2 book-level + ~88 chapter-level, 90 files total — into
+`zip-cache/` (gitignored) using a normal seekable local file, not the
+streaming `_NonSeekableWriter` trick (only needed for a live HTTP
+response). `do_GET`'s two download routes now check
+`zip-cache/book/<id>.zip` / `zip-cache/book/<id>/<slug>.zip` first; if
+present, `AudioHandler.serve_cached_zip()` serves it as a plain static
+file with a real `Content-Length` (browser shows exact size/progress).
+If **absent**, falls straight back to the existing `serve_zip()` live-build
+— so a missing/stale cache entry never breaks downloads, it just means
+that one won't show a size until the cache is (re)built.
+
+**Storage cost**: ~34GB (every file appears once in its book-zip and once
+in its chapter-zip, so ~2× the ~17GB source audio total) — checked against
+free disk space before doing this (373GB free at the time, 339GB after).
+**Not** rebuilt automatically on `app.py` startup (would add real time to
+every restart, which happens often during development) — re-run
+`python3 build_zip_cache.py` manually whenever audio content changes,
+same "restart needed to pick up new episodes" pattern as the library scan.
+
+Verified: small-scale cache-hit/cache-miss test first (manually placed one
+test zip, confirmed cache-hit path returns the exact byte-for-byte file
+with correct `Content-Length`, confirmed an uncached chapter still falls
+back to the old streaming behavior correctly), *then* ran the full build
+(90/90 files, ~34GB, well under a minute — NVMe + `ZIP_STORED` means it's
+essentially a fast copy), spot-checked 4 real cached zips with
+`zipfile.testzip()` (all clean, entry counts correct — 308 + 135 = 443,
+matching the known total exactly), then confirmed on live production that
+both a chapter zip and the ~4GB changdev whole-book zip return the correct
+real `Content-Length` matching the build script's own reported sizes.
+
+## gzip compression (added 2026-08-11)
+
+`AudioHandler.maybe_gzip()`/`send_compressible()` gzip-compress the
+response body when the client sends `Accept-Encoding: gzip` (essentially
+universal) — applied to HTML (`serve_html`), JSON (`serve_json`), and the
+frontend's built `.js`/`.css`/`.svg` (`serve_frontend_asset`). Skipped
+below 512 bytes (not worth the overhead) and **deliberately never applied**
+to audio, images, ZIPs, or `.woff`/`.woff2` fonts — all already-compressed
+binary formats where gzip would only cost CPU for no size win, and for
+Range-requested audio specifically, compressing would actively break
+byte-range semantics (a "byte 1000000 of the compressed stream" has no
+stable relationship to "byte 1000000 of the audio" — this must never be
+touched).
+
+Verified real-world impact before deploying: `/api/library` (large,
+repetitive, mostly-Devanagari JSON) went from 264,047 bytes to 12,007 —
+a 95% reduction. The frontend JS bundle went from ~940KB to ~296KB,
+matching Vite's own reported gzip size from its build output. Confirmed
+separately that audio/image responses never get a `Content-Encoding`
+header even when the client offers gzip, and that Range requests on audio
+still return the correct partial content — gzip must never come anywhere
+near that code path.
 
 ## Access log
 

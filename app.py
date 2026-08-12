@@ -7,11 +7,13 @@ import html
 import json
 import logging
 import zipfile
+import gzip
 from logging.handlers import RotatingFileHandler
 
 AUDIO_DIR = os.path.expanduser("~/Desktop/अमृतकण")
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 FRONTEND_DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
+ZIP_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zip-cache")
 ACCESS_LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "access.log")
 PORT = 8080
 CHUNK_SIZE = 64 * 1024
@@ -447,10 +449,20 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
                 self.serve_json(api_home())
             elif parts[0] == "download" and len(parts) == 3 and parts[1] == "book":
                 display_name, items = build_book_zip_items(parts[2])
-                self.serve_zip(f"{parts[2]}.zip", f"{display_name}.zip", items)
+                cached = os.path.join(ZIP_CACHE_DIR, "book", f"{parts[2]}.zip")
+                ascii_name, disp = f"{parts[2]}.zip", f"{display_name}.zip"
+                if os.path.isfile(cached):
+                    self.serve_cached_zip(cached, ascii_name, disp)
+                else:
+                    self.serve_zip(ascii_name, disp, items)
             elif parts[0] == "download" and len(parts) == 4 and parts[1] == "book":
                 display_name, items = build_chapter_zip_items(parts[2], parts[3])
-                self.serve_zip(f"{parts[2]}-{parts[3]}.zip", f"{display_name}.zip", items)
+                cached = os.path.join(ZIP_CACHE_DIR, "book", parts[2], f"{parts[3]}.zip")
+                ascii_name, disp = f"{parts[2]}-{parts[3]}.zip", f"{display_name}.zip"
+                if os.path.isfile(cached):
+                    self.serve_cached_zip(cached, ascii_name, disp)
+                else:
+                    self.serve_zip(ascii_name, disp, items)
             elif parts[0] == "book" and len(parts) == 2:
                 if parts[1] not in LIBRARY:
                     raise LookupError(parts[1])
@@ -474,21 +486,37 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
             base_url = f"{scheme}://{host}"
         self.serve_html(spa_shell(title, base_url))
 
-    def serve_html(self, body_str):
-        body = body_str.encode("utf-8")
+    def maybe_gzip(self, body):
+        """gzip-compress a text-based response body when the client says it
+        accepts gzip. Only called for text/JSON/JS/CSS — never for images,
+        audio, or ZIPs, which are already-compressed binary formats where
+        gzip would just burn CPU for no size win (or, for Range-requested
+        audio, actively break byte-range semantics). Returns
+        (possibly-compressed body, "gzip" or None) — caller sets headers."""
+        if len(body) < 512:
+            return body, None
+        if "gzip" not in self.headers.get("Accept-Encoding", ""):
+            return body, None
+        return gzip.compress(body, compresslevel=6), "gzip"
+
+    def send_compressible(self, body, content_type, extra_headers=None):
+        body, encoding = self.maybe_gzip(body)
         self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Type", content_type)
+        if encoding:
+            self.send_header("Content-Encoding", encoding)
         self.send_header("Content-Length", str(len(body)))
+        for key, value in (extra_headers or {}).items():
+            self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
 
+    def serve_html(self, body_str):
+        self.send_compressible(body_str.encode("utf-8"), "text/html; charset=utf-8")
+
     def serve_json(self, data):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        self.send_compressible(body, "application/json; charset=utf-8")
 
     def serve_static(self, filename):
         safe = os.path.basename(filename)
@@ -523,13 +551,20 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
         }.get(ext, "application/octet-stream")
         with open(filepath, "rb") as f:
             data = f.read()
-        self.send_response(200)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(data)))
         # Vite content-hashes these filenames, so a hit is immutable forever.
-        self.send_header("Cache-Control", "public, max-age=31536000, immutable")
-        self.end_headers()
-        self.wfile.write(data)
+        cache_header = {"Cache-Control": "public, max-age=31536000, immutable"}
+        # .woff/.woff2 are already-compressed binary font formats — gzip
+        # would just cost CPU for no size win, same reasoning as audio/images.
+        if ext in (".js", ".css", ".svg"):
+            self.send_compressible(data, ctype, extra_headers=cache_header)
+        else:
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            for key, value in cache_header.items():
+                self.send_header(key, value)
+            self.end_headers()
+            self.wfile.write(data)
 
     def serve_audio(self, filename):
         safe_name = os.path.basename(filename)
@@ -578,10 +613,37 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def serve_cached_zip(self, filepath, ascii_name, display_name):
+        """Serves a pre-built ZIP straight from disk (see zip-cache/,
+        populated by build_zip_cache.py) — a real file with a known size, so
+        unlike serve_zip() below this can send a real Content-Length and the
+        browser shows file size/progress during download."""
+        file_size = os.path.getsize(filepath)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(file_size))
+            self.send_header(
+                "Content-Disposition",
+                f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{urllib.parse.quote(display_name)}",
+            )
+            self.end_headers()
+            with open(filepath, "rb") as f:
+                while True:
+                    chunk = f.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def serve_zip(self, ascii_name, display_name, items):
         """Streams a ZIP of the given (arcname, filepath) pairs directly to
         the client, uncompressed (ZIP_STORED - the mp3/m4a sources are already
         compressed, so re-compressing would only cost CPU for no size win).
+        Fallback path used only when zip-cache/ doesn't have this book/chapter
+        pre-built yet (see build_zip_cache.py) — e.g. right after new audio
+        content is added but before the cache script has been re-run.
         No Content-Length is sent since the total size isn't known upfront
         without a first pass over every file; sending Connection: close
         instead lets the client treat the socket closing as end-of-body, which

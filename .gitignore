@@ -6,3 +6,4 @@ healthcheck.log
 .healthcheck_state
 frontend/node_modules/
 frontend/dist/
+zip-cache/

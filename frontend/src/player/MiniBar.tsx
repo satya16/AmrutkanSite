@@ -57,8 +57,8 @@ export default function MiniBar() {
           success={{ percent: playedPct, strokeColor: '#e8935a' }}
           showInfo={false}
           size="small"
-          strokeColor="rgba(255,255,255,0.35)"
-          trailColor="rgba(255,255,255,0.15)"
+          strokeColor="rgba(232,147,90,0.45)"
+          trailColor="rgba(255,255,255,0.12)"
           style={{ marginTop: 4, lineHeight: 0 }}
         />
       </div>

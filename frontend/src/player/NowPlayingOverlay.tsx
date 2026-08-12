@@ -14,6 +14,10 @@ import {
 } from '@ant-design/icons'
 
 const SKIP_SECONDS = 30
+// Accent at reduced opacity — a real tinted color, not just another shade of
+// gray, so "buffered but not played" reads clearly against both the plain
+// rail (colorBorder) and the fully-played accent segment in either theme.
+const BUFFERED_COLOR = 'rgba(181, 84, 26, 0.4)'
 
 function SkipIcon({ icon, label }: { icon: ReactNode; label: string }) {
   return (
@@ -104,7 +108,7 @@ export default function NowPlayingOverlay() {
             // underneath it — buffered-but-unplayed vs not-yet-loaded —
             // YouTube's "how much has loaded" bar, without extra DOM nodes.
             rail: {
-              background: `linear-gradient(to right, ${token.colorFillSecondary} 0%, ${token.colorFillSecondary} ${bufferedPct}%, ${token.colorFillTertiary} ${bufferedPct}%, ${token.colorFillTertiary} 100%)`,
+              background: `linear-gradient(to right, ${BUFFERED_COLOR} 0%, ${BUFFERED_COLOR} ${bufferedPct}%, ${token.colorBorder} ${bufferedPct}%, ${token.colorBorder} 100%)`,
             },
           }}
         />

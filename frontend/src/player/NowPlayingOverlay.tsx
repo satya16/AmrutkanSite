@@ -1,14 +1,28 @@
-import { Button, Drawer, Dropdown, Popover, Slider, Space, Typography } from 'antd'
+import { Button, Drawer, Dropdown, Popover, Slider, Space, Typography, theme as antdTheme } from 'antd'
 import type { MenuProps } from 'antd'
+import type { ReactNode } from 'react'
 import {
   DownloadOutlined,
   MinusOutlined,
   PauseCircleFilled,
   PlayCircleFilled,
   QuestionCircleOutlined,
+  RedoOutlined,
   StepBackwardFilled,
   StepForwardFilled,
+  UndoOutlined,
 } from '@ant-design/icons'
+
+const SKIP_SECONDS = 30
+
+function SkipIcon({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+      {icon}
+      <span style={{ fontSize: 10, marginTop: 2 }}>{label}</span>
+    </span>
+  )
+}
 import { SPEED_PRESETS, formatTime, usePlayer } from './PlayerContext'
 
 const SLEEP_OPTIONS: { value: 'episode' | number | 'off'; label: string }[] = [
@@ -22,7 +36,10 @@ const SLEEP_OPTIONS: { value: 'episode' | number | 'off'; label: string }[] = [
 
 export default function NowPlayingOverlay() {
   const player = usePlayer()
+  const { token } = antdTheme.useToken()
   if (!player.currentSrc) return null
+
+  const bufferedPct = player.duration ? (player.buffered / player.duration) * 100 : 0
 
   const speedMenu: MenuProps = {
     selectedKeys: [String(player.speed)],
@@ -81,13 +98,28 @@ export default function NowPlayingOverlay() {
           value={player.currentTime}
           tooltip={{ formatter: (v) => formatTime(v ?? 0) }}
           onChange={(v) => player.seekTo(v)}
+          styles={{
+            // The played portion draws on top via the Slider's own track
+            // (colorPrimary) up to `value`; this gradient just paints what's
+            // underneath it — buffered-but-unplayed vs not-yet-loaded —
+            // YouTube's "how much has loaded" bar, without extra DOM nodes.
+            rail: {
+              background: `linear-gradient(to right, ${token.colorFillSecondary} 0%, ${token.colorFillSecondary} ${bufferedPct}%, ${token.colorFillTertiary} ${bufferedPct}%, ${token.colorFillTertiary} 100%)`,
+            },
+          }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
           <span>{formatTime(player.currentTime)}</span>
           <span>{formatTime(player.duration)}</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32, margin: '24px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, margin: '24px 0' }}>
+          <Button
+            type="text"
+            icon={<SkipIcon icon={<UndoOutlined style={{ fontSize: 20 }} />} label={String(SKIP_SECONDS)} />}
+            onClick={() => player.seekTo(Math.max(0, player.currentTime - SKIP_SECONDS))}
+            aria-label={`${SKIP_SECONDS} सेकंद मागे`}
+          />
           <Button
             type="text"
             icon={<StepBackwardFilled style={{ fontSize: 28 }} />}
@@ -113,6 +145,12 @@ export default function NowPlayingOverlay() {
             disabled={!player.playlist || player.currentIndex >= player.playlist.length - 1}
             onClick={player.playNext}
             aria-label="Next track"
+          />
+          <Button
+            type="text"
+            icon={<SkipIcon icon={<RedoOutlined style={{ fontSize: 20 }} />} label={String(SKIP_SECONDS)} />}
+            onClick={() => player.seekTo(Math.min(player.duration || 0, player.currentTime + SKIP_SECONDS))}
+            aria-label={`${SKIP_SECONDS} सेकंद पुढे`}
           />
         </div>
 

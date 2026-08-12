@@ -4,6 +4,7 @@ import { Breadcrumb, Button, List, Result, Skeleton, Typography } from 'antd'
 import { DownloadOutlined, PauseCircleFilled, PlayCircleFilled, PlayCircleOutlined } from '@ant-design/icons'
 import { fetchLibrary, type Book, type Chapter, type Library } from '../api'
 import { usePlayer } from '../player/PlayerContext'
+import { buildBookPlaylist } from '../bookPlaylist'
 import { ACCENT } from '../theme'
 
 export default function ChapterPage() {
@@ -67,7 +68,7 @@ export default function ChapterPage() {
       <List
         bordered
         dataSource={chapter.episodes}
-        renderItem={(episode, index) => {
+        renderItem={(episode) => {
           const isCurrent = player.currentSrc === episode.audioUrl
           const playIcon = isCurrent ? (
             player.isPlaying ? (
@@ -81,13 +82,15 @@ export default function ChapterPage() {
           return (
             <List.Item
               className="episode-item"
-              onClick={() =>
+              onClick={() => {
+                const playlist = buildBookPlaylist(book)
                 player.play(episode.audioUrl, episode.label, {
                   subtitle: `${book.name} · ${chapter.label}`,
-                  playlist: chapter.episodes.map((e) => ({ src: e.audioUrl, label: e.label })),
-                  index,
+                  playlist,
+                  index: playlist.findIndex((p) => p.src === episode.audioUrl),
+                  bookId: book.id,
                 })
-              }
+              }}
               style={{ cursor: 'pointer' }}
               actions={[
                 <a

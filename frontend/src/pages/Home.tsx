@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Col, Row, Skeleton, Space, Typography, theme as antdTheme } from 'antd'
 import { fetchHome, fetchLibrary, type HomeContent, type Library } from '../api'
 import { toDevanagari } from '../devanagari'
+import ContinueListening from '../components/ContinueListening'
 
 const MOBILE_UA_RE = /iphone|ipad|ipod|android/i
 
@@ -65,6 +66,7 @@ export default function Home() {
           <Typography.Paragraph type="secondary" style={{ fontSize: 16 }}>
             {home.tagline}
           </Typography.Paragraph>
+          <ContinueListening library={library} />
         </div>
 
         <Row gutter={[16, 16]} style={{ marginTop: 48 }}>

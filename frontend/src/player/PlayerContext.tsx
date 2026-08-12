@@ -13,6 +13,10 @@ import { toDevanagari } from '../devanagari'
 export interface PlaylistItem {
   src: string
   label: string
+  // Per-item subtitle so playNext/playPrev show the right book/chapter
+  // as the queue crosses chapter boundaries (a whole-book playlist mixes
+  // items from several chapters — see bookPlaylist.ts).
+  subtitle?: string
 }
 
 export type SleepMode = 'episode' | number | null
@@ -23,9 +27,11 @@ interface PlaySnapshot {
   subtitle: string
   playlist: PlaylistItem[] | null
   currentIndex: number
+  bookId: string
   isPlaying: boolean
   currentTime: number
   duration: number
+  buffered: number
   speed: number
   sleepMode: SleepMode
   sleepRemainingMin: number | null
@@ -36,11 +42,34 @@ interface PlayOpts {
   subtitle?: string
   playlist?: PlaylistItem[]
   index?: number
+  bookId?: string
+  // Only meaningful when switching to a new src (e.g. the "continue
+  // listening" button resuming a paused episode from a previous visit).
+  resumeTime?: number
 }
 
 export const SPEED_PRESETS = [0.75, 1, 1.25, 1.5, 1.75, 2]
 const SPEED_KEY = 'ak_speed'
 const PLAYBACK_KEY = 'ak_playback'
+// Book-level "continue listening" progress — separate from PLAYBACK_KEY
+// (which is playlist/chapter-scoped) since this needs to survive across
+// chapter boundaries so Home can resolve "resume" vs "next episode" vs
+// "book finished" without depending on whatever playlist happens to be
+// loaded right now.
+const PROGRESS_KEY = 'ak_progress'
+
+export interface SavedProgress {
+  bookId: string
+  filename: string
+  completed: boolean
+  currentTime: number
+}
+
+function filenameFromSrc(src: string): string {
+  const marker = '/audio/'
+  const i = src.indexOf(marker)
+  return i === -1 ? src : decodeURIComponent(src.slice(i + marker.length))
+}
 
 interface PlayerContextValue extends PlaySnapshot {
   play: (src: string, label: string, opts?: PlayOpts) => void
@@ -89,9 +118,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     subtitle: '',
     playlist: null,
     currentIndex: -1,
+    bookId: '',
     isPlaying: false,
     currentTime: 0,
     duration: 0,
+    buffered: 0,
     speed: initialSpeed(),
     sleepMode: 'episode',
     sleepRemainingMin: null,
@@ -104,6 +135,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const update = useCallback((patch: Partial<PlaySnapshot>) => {
     stateRef.current = { ...stateRef.current, ...patch }
     forceRender()
+  }, [])
+
+  const saveProgress = useCallback((completed: boolean) => {
+    const s = stateRef.current
+    if (!s.currentSrc || !s.bookId) return
+    localStorage.setItem(
+      PROGRESS_KEY,
+      JSON.stringify({
+        bookId: s.bookId,
+        filename: filenameFromSrc(s.currentSrc),
+        completed,
+        currentTime: completed ? 0 : (audioRef.current?.currentTime ?? 0),
+      } satisfies SavedProgress),
+    )
   }, [])
 
   const savePlayback = useCallback(() => {
@@ -121,7 +166,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         currentTime: audioRef.current.currentTime,
       }),
     )
-  }, [])
+    saveProgress(false)
+  }, [saveProgress])
 
   const play = useCallback(
     (src: string, label: string, opts: PlayOpts = {}) => {
@@ -134,6 +180,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         audio.playbackRate = s.speed
         patch.currentSrc = src
         patch.currentLabel = label
+        patch.bookId = opts.bookId ?? ''
+        resumeTimeRef.current = opts.resumeTime || 0
       }
       if (opts.subtitle !== undefined) patch.subtitle = opts.subtitle
       if (opts.playlist !== undefined) {
@@ -158,14 +206,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const s = stateRef.current
     if (!s.playlist || s.currentIndex <= 0) return
     const item = s.playlist[s.currentIndex - 1]
-    play(item.src, item.label, { subtitle: s.subtitle, playlist: s.playlist, index: s.currentIndex - 1 })
+    play(item.src, item.label, {
+      subtitle: item.subtitle ?? s.subtitle,
+      playlist: s.playlist,
+      index: s.currentIndex - 1,
+      bookId: s.bookId,
+    })
   }, [play])
 
   const playNext = useCallback(() => {
     const s = stateRef.current
     if (!s.playlist || s.currentIndex >= s.playlist.length - 1) return
     const item = s.playlist[s.currentIndex + 1]
-    play(item.src, item.label, { subtitle: s.subtitle, playlist: s.playlist, index: s.currentIndex + 1 })
+    play(item.src, item.label, {
+      subtitle: item.subtitle ?? s.subtitle,
+      playlist: s.playlist,
+      index: s.currentIndex + 1,
+      bookId: s.bookId,
+    })
   }, [play])
 
   const seekTo = useCallback((time: number) => {
@@ -229,6 +287,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       isPlaying: false,
       currentTime: 0,
       duration: 0,
+      buffered: 0,
       sleepMode: 'episode',
       sleepRemainingMin: null,
       overlayOpen: false,
@@ -265,6 +324,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         resumeTimeRef.current = 0
       }
     }
+    // Fires repeatedly as the browser downloads more of the file — used to
+    // draw the "how much has loaded" portion of the seek bar, YouTube-style.
+    const onProgress = () => {
+      const ranges = audio.buffered
+      update({ buffered: ranges.length ? ranges.end(ranges.length - 1) : 0 })
+    }
     const onPlay = () => update({ isPlaying: true })
     const onPause = () => {
       update({ isPlaying: false })
@@ -272,6 +337,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
     const onEnded = () => {
       audio.currentTime = 0
+      saveProgress(true)
       const s = stateRef.current
       if (s.sleepMode === 'episode') {
         update({ sleepMode: null })
@@ -282,6 +348,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     audio.addEventListener('timeupdate', onTimeUpdate)
     audio.addEventListener('loadedmetadata', onLoadedMetadata)
+    audio.addEventListener('progress', onProgress)
     audio.addEventListener('play', onPlay)
     audio.addEventListener('pause', onPause)
     audio.addEventListener('ended', onEnded)
@@ -291,6 +358,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate)
       audio.removeEventListener('loadedmetadata', onLoadedMetadata)
+      audio.removeEventListener('progress', onProgress)
       audio.removeEventListener('play', onPlay)
       audio.removeEventListener('pause', onPause)
       audio.removeEventListener('ended', onEnded)

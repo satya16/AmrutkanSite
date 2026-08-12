@@ -46,6 +46,15 @@ export default function PustakPage() {
   const [isLandscape, setIsLandscape] = useState(
     () => window.matchMedia('(orientation: landscape)').matches,
   )
+  // The fit-width math below needs the *current* viewport size, but mobile
+  // browsers don't necessarily finish resizing the visual viewport in the
+  // same tick as the matchMedia orientation flip — reading
+  // window.innerWidth/innerHeight directly at render time could grab a
+  // stale, mid-rotation value and leave the canvas sized for the old
+  // orientation ("zoom is weird" after portrait -> landscape -> portrait).
+  // Tracking both via their own resize listener keeps them reactive
+  // through the whole transition, not just at the orientation boundary.
+  const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
   // Zoom only applies in fullscreen (immersive). 1 = fit-to-screen default.
   // Tracking the loaded image's own pixel dimensions lets zoom compute an
   // exact fit width instead of fighting CSS percentage/max-height rules.
@@ -156,6 +165,12 @@ export default function PustakPage() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
+  useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight })
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   // Zoom is per-page and per-orientation — a fresh page or a rotation
   // should start back at fit-to-screen rather than carrying over a zoom
   // level computed for a different layout.
@@ -245,9 +260,7 @@ export default function PustakPage() {
   } else if (!naturalSize) {
     canvasStyle = { width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: 'calc(100vh - 64px)' }
   } else {
-    const fitWidth = isLandscape
-      ? window.innerWidth
-      : (window.innerHeight - 64) * (naturalSize.w / naturalSize.h)
+    const fitWidth = isLandscape ? viewport.w : (viewport.h - 64) * (naturalSize.w / naturalSize.h)
     canvasStyle = { width: `${fitWidth * zoom}px`, height: 'auto', maxWidth: 'none' }
   }
 

@@ -377,6 +377,31 @@ Behavior is unchanged from the original design:
   (`{src, label, subtitle, playlist, index, currentTime}`), saved on pause,
   every ~5s during playback, and on `pagehide`. Restores track/position on
   load but does **not** autoplay.
+- **Continue Listening homepage widget** (`components/ContinueListening.tsx`,
+  `continueListening.ts`) — separate from the above: book-level progress
+  (`localStorage` key `ak_progress`, `{bookId, filename, completed,
+  currentTime}`) drives a single CTA button on `Home.tsx`.
+  `resolveContinueListening(library, progress)` resolves it to one of four
+  states: **`first`** — no `ak_progress` at all yet (brand new visitor) —
+  "पहिला भाग ऐका" pointing at the very first episode of `library.books[0]`
+  (ज्ञानेश्वरी); **`resume`** — mid-episode, "ऐकणे सुरू ठेवा"; **`next`** —
+  finished an episode that isn't the last one *in the whole library*
+  (crosses from one book into the next book's first episode once a book's
+  own last episode is done — ज्ञानेश्वरी's last episode leads into चांगदेव
+  पासष्टी's first, not a dead end), "पुढचा भाग ऐका"; **`finished`** — the
+  last episode of the *last* book in `library.books` order is done, nothing
+  left to suggest, rendered as a disabled `Button` (added 2026-08-12,
+  replacing an earlier version that only tracked progress per-book and
+  showed "finished" the moment any one book's last episode ended, with no
+  cross-book continuation). `progress` is now allowed to be `null` — that
+  case used to be the caller's job to check before calling; folding it in
+  as the `first` state avoids a duplicate null-check at each call site.
+  Verified with Playwright against all four states (including forged
+  `ak_progress` values for the two book-boundary cases, since actually
+  listening through hundreds of episodes isn't practical to test): each
+  showed the correct caption/target, the cross-book case correctly landed
+  on चांगदेव पासष्टी's first episode by label, and the fully-finished case
+  rendered as an actually-disabled `<button>`, not just inert-looking text.
 - **Playback speed** (`SPEED_PRESETS = [0.75, 1, 1.25, 1.5, 1.75, 2]`,
   `localStorage` key `ak_speed`) and **sleep timer** (episode-end default,
   or 15/30/45/60 min, or off — timer state intentionally *not* persisted
@@ -615,6 +640,32 @@ fresh visit started at page 1, navigating to page 25 wrote
 client-side nav) resumed at page 25, and navigating to the *other* book
 correctly started at page 1 rather than inheriting the first book's saved
 position.
+
+**Bugfix: rotating while zoomed left the canvas "weird"-sized (fixed
+2026-08-12)**: reported by the user — enter fullscreen, rotate portrait ->
+landscape -> back to portrait, and the page came out sized wrong instead
+of cleanly resetting. Root cause: the fit-width calculation read
+`window.innerWidth`/`window.innerHeight` directly at render time instead
+of from reactive state. Mobile browsers don't necessarily finish resizing
+the visual viewport in the same tick as the `matchMedia('(orientation:
+landscape)')` `change` event that `isLandscape` reacts to, so that render
+could grab a stale, mid-rotation dimension and leave the canvas sized for
+the wrong orientation until some *unrelated* state change (a page turn,
+say) forced a fresh render with correct values. Fixed by adding a
+`viewport` state (`{w, h}`) updated via its own `window.addEventListener
+('resize', ...)`, and using `viewport.w`/`viewport.h` in the fit-width
+math instead of reading `window.*` inline — keeps it reactive through the
+*entire* transition, not just at the orientation boundary. Verified with
+Playwright (real browser-window resize can't be simulated while genuine
+Fullscreen API is engaged, so `HTMLElement.prototype.requestFullscreen`
+was stubbed to reject for this test — which incidentally also exercises
+the CSS-only immersive fallback path that iOS Safari/in-app browsers
+always use anyway): portrait canvas width 476.2px -> zoomed to 714.3px
+(1.5×) -> rotated to landscape, width became exactly 800px (viewport
+width) with zoom reset to 1× -> rotated back to portrait, width returned
+to *exactly* 476.2px with zoom still at 1× (zoom-out button confirmed
+disabled at the minimum) — matching the original pre-zoom portrait state
+exactly, not an approximation.
 
 ## Bulk ZIP download (added 2026-08-11)
 

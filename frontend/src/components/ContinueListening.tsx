@@ -1,4 +1,4 @@
-import { Button, Typography, theme as antdTheme } from 'antd'
+import { Button } from 'antd'
 import { CheckCircleFilled, PlayCircleFilled } from '@ant-design/icons'
 import type { Library } from '../api'
 import { usePlayer } from '../player/PlayerContext'
@@ -7,7 +7,6 @@ import { buildBookPlaylist } from '../bookPlaylist'
 
 export default function ContinueListening({ library }: { library: Library }) {
   const player = usePlayer()
-  const { token } = antdTheme.useToken()
 
   // Deliberately recomputed on every render rather than cached in useState —
   // usePlayer() re-renders this component whenever playback state changes
@@ -17,33 +16,41 @@ export default function ContinueListening({ library }: { library: Library }) {
   // time made this button go stale the moment playback moved on without a
   // navigation to remount the component.
   const progress = loadProgress()
-  const state = progress ? resolveContinueListening(library, progress) : null
+  const state = resolveContinueListening(library, progress)
 
   if (!state) return null
 
   if (state.mode === 'finished') {
+    // Every book, fully listened — a disabled button (not just a message)
+    // so it stays visually part of the same "here's what to do next"
+    // control family, just inert now that there's nothing left to suggest.
     return (
-      <div
+      <Button
+        disabled
         style={{
           margin: '32px auto 0',
+          height: 'auto',
           width: '100%',
           maxWidth: 420,
-          padding: '16px 20px',
-          borderRadius: 12,
-          background: token.colorFillTertiary,
+          padding: '14px 20px',
           display: 'flex',
           alignItems: 'center',
           gap: 12,
+          textAlign: 'left',
         }}
       >
-        <CheckCircleFilled style={{ fontSize: 22, color: token.colorTextSecondary }} />
-        <Typography.Text type="secondary">तुम्ही {state.book.name} पूर्ण ऐकले आहे</Typography.Text>
-      </div>
+        <CheckCircleFilled style={{ fontSize: 26 }} />
+        <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.4 }}>
+          <span style={{ fontSize: 12, opacity: 0.85 }}>सर्व निरूपण पूर्ण झाले</span>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>तुम्ही संपूर्ण संग्रह ऐकला आहे</span>
+        </span>
+      </Button>
     )
   }
 
+  const caption =
+    state.mode === 'first' ? 'पहिला भाग ऐका' : state.mode === 'resume' ? 'ऐकणे सुरू ठेवा' : 'पुढचा भाग ऐका'
   const isResume = state.mode === 'resume'
-  const caption = isResume ? 'ऐकणे सुरू ठेवा' : 'पुढचा भाग ऐका'
   const playlist = buildBookPlaylist(state.book)
   const index = playlist.findIndex((p) => p.src === state.episode.audioUrl)
 

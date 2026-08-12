@@ -32,6 +32,19 @@ export interface PodcastLink {
   path: string
 }
 
+export interface PustakBook {
+  id: string
+  title: string
+  subtitle: string
+  author: string
+  pageCount: number
+  thumbnailUrl: string
+}
+
+export interface PustakList {
+  books: PustakBook[]
+}
+
 export interface HomeContent {
   tagline: string
   siteDescription: string
@@ -55,6 +68,7 @@ async function getJSON<T>(url: string): Promise<T> {
 
 export const fetchLibrary = () => getJSON<Library>('/api/library')
 export const fetchHome = () => getJSON<HomeContent>('/api/home')
+export const fetchPustake = () => getJSON<PustakList>('/api/pustake')
 
 export interface FeedbackPayload {
   message: string

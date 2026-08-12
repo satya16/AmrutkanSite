@@ -7,4 +7,5 @@ healthcheck.log
 frontend/node_modules/
 frontend/dist/
 zip-cache/
+pustak-cache/
 .env.feedback

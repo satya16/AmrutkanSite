@@ -9,6 +9,7 @@ import NowPlayingOverlay from './player/NowPlayingOverlay'
 import Home from './pages/Home'
 import BookPage from './pages/Book'
 import ChapterPage from './pages/Chapter'
+import PustakPage from './pages/Pustak'
 import FeedbackButton from './components/FeedbackButton'
 import { ACCENT } from './theme'
 
@@ -160,6 +161,7 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
           <Route path="/" element={<Home />} />
           <Route path="/book/:bookId" element={<BookPage />} />
           <Route path="/book/:bookId/:slug" element={<ChapterPage />} />
+          <Route path="/pustak/:bookId" element={<PustakPage />} />
         </Routes>
       </Layout.Content>
       <Layout.Footer

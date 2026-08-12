@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Col, Row, Skeleton, Space, Typography, theme as antdTheme } from 'antd'
-import { fetchHome, fetchLibrary, type HomeContent, type Library } from '../api'
+import { fetchHome, fetchLibrary, fetchPustake, type HomeContent, type Library, type PustakBook } from '../api'
 import { toDevanagari } from '../devanagari'
 import ContinueListening from '../components/ContinueListening'
 
@@ -25,12 +25,17 @@ function Section({
 export default function Home() {
   const [library, setLibrary] = useState<Library | null>(null)
   const [home, setHome] = useState<HomeContent | null>(null)
+  const [pustake, setPustake] = useState<PustakBook[] | null>(null)
   const isMobile = MOBILE_UA_RE.test(navigator.userAgent)
   const { token } = antdTheme.useToken()
 
   useEffect(() => {
     fetchLibrary().then(setLibrary)
     fetchHome().then(setHome)
+    // Own fetch, own null state — the पुस्तके section renders once this
+    // resolves regardless of library/home, no reason to block the rest of
+    // the page on it.
+    fetchPustake().then((data) => setPustake(data.books))
   }, [])
 
   if (!library || !home) {
@@ -140,8 +145,51 @@ export default function Home() {
         </Row>
       </Section>
 
-      {/* About: its own section again, back to the base tint. */}
-      <Section background={token.colorBgContainer}>
+      {/* पुस्तके: digital-only book reader, own section between YouTube and
+          About. Only rendered once the fetch resolves with at least one
+          book — thumbnailUrl is empty (and this stays hidden) if the page
+          cache hasn't been built yet, see build_pustak_cache.py. */}
+      {pustake && pustake.length > 0 && (
+        <Section background={token.colorBgContainer}>
+          <Typography.Title level={2} style={{ textAlign: 'center' }}>
+            पुस्तके
+          </Typography.Title>
+          <Row gutter={[16, 16]} style={{ marginTop: 16, justifyContent: 'center' }}>
+            {pustake.map((book) => (
+              <Col xs={12} sm={8} key={book.id}>
+                <Link to={`/pustak/${book.id}`} className="tile-link">
+                  <div style={{ textAlign: 'center' }}>
+                    <img
+                      src={book.thumbnailUrl}
+                      alt={book.title}
+                      draggable={false}
+                      onContextMenu={(e) => e.preventDefault()}
+                      style={{
+                        width: '100%',
+                        aspectRatio: '2 / 3',
+                        objectFit: 'cover',
+                        borderRadius: 8,
+                        boxShadow: token.boxShadow,
+                      }}
+                    />
+                    <Typography.Text strong style={{ display: 'block', marginTop: 8 }}>
+                      {book.title}
+                    </Typography.Text>
+                    {book.author && (
+                      <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                        {book.author}
+                      </Typography.Text>
+                    )}
+                  </div>
+                </Link>
+              </Col>
+            ))}
+          </Row>
+        </Section>
+      )}
+
+      {/* About: alternates tint again so it reads distinct from पुस्तके above it. */}
+      <Section background={token.colorFillAlter}>
         <Typography.Title level={2} style={{ textAlign: 'center' }}>
           आमच्याबद्दल
         </Typography.Title>

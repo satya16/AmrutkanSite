@@ -46,6 +46,11 @@ below for how that's split from the still-dependency-free Python backend.
 - `build_zip_cache.py` — one-off script, pre-builds `zip-cache/` (gitignored,
   ~34GB, not checked in) — see "ZIP cache" under "Bulk ZIP download" below.
   Re-run manually whenever audio content changes.
+- `build_pustak_cache.py` — one-off script, renders the two digital books'
+  PDFs into per-page JPEGs under `pustak-cache/` (gitignored, ~44MB) — see
+  "Digital book reader" below. Source PDFs themselves live outside the repo
+  at `~/Desktop/पुस्तके/` (this repo is public, so a PDF must never be
+  committed here). Re-run manually whenever a book is added/replaced.
 - Audio content itself is **not** in this folder — it's read directly from
   `~/Desktop/अमृतकण` (see `AUDIO_DIR` in `app.py`). 443 files (401 `.mp3` +
   42 `.m4a`), ~17GB total. **Physically arranged on disk to mirror both the
@@ -385,6 +390,188 @@ Behavior is unchanged from the original design:
   (`spa_shell()` in `app.py`, not the frontend); OG tags generated
   server-side per-route so link previews work without needing SSR of the
   actual React content.
+
+## Digital book reader — पुस्तके (added 2026-08-12)
+
+A second, unrelated content type from the audio library: two spiritual
+books by the same author (सुरेश चौधरी / डॉ. सुरेश चौधरी) — **सोपी गीता**
+(107 pages) and **चैतन्य सागर** (160 pages, subtitle "ज्ञानेश्वरी ग्रंथ का
+हिन्दी सारांश") — shown page-by-page on the site, deliberately **not**
+downloadable as a PDF. The author's own copyright notice inside चैतन्य
+सागर explicitly prohibits reproduction without written permission, so
+this isn't just a nice-to-have: the whole design is built around never
+letting a complete, high-fidelity copy of either book reach the client
+in one file.
+
+**How "can't download the PDF" actually works** — realistically, nothing
+running in a browser can stop a screenshot or screen recording. What this
+*does* stop is the casual/one-click path (a saved PDF, a spoofed download
+link, a browser "Save Page As"):
+- The source PDFs are **never in the repo and never served**. They live
+  outside the repo entirely, at `PUSTAK_SOURCE_DIR`
+  (`~/Desktop/पुस्तके/<title>.pdf`) — same convention as `AUDIO_DIR`, and
+  necessary because **this repo is public** (see "AmrutkanSite repo
+  renamed+public" — anything committed here is world-readable in git
+  history forever).
+- `build_pustak_cache.py` (repo root, one-off script, same pattern as
+  `build_zip_cache.py`) pre-renders every page of every book to a JPEG via
+  poppler's `pdftoppm` CLI — **no pip dependency**, `poppler-utils` is
+  already an installed system package (see "No pip/venv" below).
+  150 DPI / JPEG quality 78 is a deliberate middle ground: fully legible
+  Devanagari text on screen, well below print quality, so reassembling a
+  page-by-page save doesn't get you a high-fidelity copy either. Output
+  goes to `pustak-cache/<book-id>/page-0001.jpg` etc (gitignored, ~44MB
+  total for both books) — `app.py` only ever reads from this cache, never
+  touches the source PDF at request time. Re-run manually whenever a book
+  is added or replaced under `PUSTAK_SOURCE_DIR`; safe to re-run any time,
+  each book renders into a temp dir and is atomically swapped in.
+- `PUSTAK_DEFS`/`PUSTAK_BY_ID` in `app.py` hold the book metadata (title,
+  subtitle, author, source filename) — titles/author were read directly
+  off each book's actual cover/title-page render (the PDFs' embedded text
+  layer is a garbled legacy Hindi font encoding, not extractable with
+  `pdftotext`; the cover images render fine, that's what was read).
+- **Backend (`app.py`)**: `/api/pustake` — book list + live page count
+  (counted from files actually present in `pustak-cache/<id>/`, no
+  restart needed if the cache is rebuilt) + `thumbnailUrl` (just page 1).
+  `/pustak/<book-id>` — SPA shell (client-side reader route, same pattern
+  as `/book/<id>`). `/pustak/<book-id>/page/<n>.jpg` —
+  `serve_pustak_page()` serves exactly one page image, 404 for an unknown
+  book id, non-numeric/out-of-range `n`, or a page not yet rendered; no
+  `Content-Disposition` is set (so it renders inline like any `<img>`,
+  never a download prompt); path traversal isn't reachable at all since
+  the filename is rebuilt from a validated `int` and a dict-whitelisted
+  book id, never from the raw request string.
+- **Frontend**: `pages/Home.tsx` — new "पुस्तके" section between यूट्यूब
+  and आमच्याबद्दल (आमच्याबद्दल's tint flipped from `colorBgContainer` to
+  `colorFillAlter` so the two sections still read as visually distinct);
+  renders only once `/api/pustake` resolves with at least one book, so a
+  not-yet-built cache just hides the section rather than showing broken
+  thumbnails. `pages/Pustak.tsx` — the reader itself: draws each page into
+  a `<canvas>` (`new Image()` → `drawImage`) rather than an `<img>`, since
+  a canvas has no built-in "Save image as…"/drag-out affordance;
+  `onContextMenu`/`onDragStart` prevented on top of that, plus
+  `user-select: none` and `-webkit-touch-callout: none` (blocks iOS
+  long-press-to-save). Prev/Next buttons + ←/→ keyboard nav; next page is
+  prefetched (`new Image().src = ...`) so paging forward feels instant.
+  Page counter uses the existing `toDevanagari()` helper ("पृष्ठ १ / १०७").
+  Registered as `/pustak/:bookId` in `App.tsx`.
+- Verified end-to-end with Playwright against the live systemd service
+  (2026-08-12): both books' cover thumbnails render correctly in the
+  पुस्तके section, the reader loads page 1, and clicking next advances to
+  page 2 with the counter updating — no console errors.
+
+**Fullscreen/immersive reading mode (added 2026-08-12)**: a button next to
+the page counter toggles a bigger, distraction-free view. Implemented as a
+CSS state (`immersive`, on the same always-mounted `readerRef` container —
+`position: fixed; inset: 0`, black background, breadcrumb/title hidden,
+canvas scaled up to fill the viewport) rather than relying solely on the
+native Fullscreen API, because that API is unsupported/blocked in a lot of
+this site's actual traffic (iOS Safari on non-video elements, in-app
+browsers like WhatsApp/Instagram). `readerRef.requestFullscreen()` is
+still attempted best-effort on top when available (also hides the browser
+chrome/address bar), wrapped in try/catch so a failure is silent and the
+CSS state is what actually matters. **Important gotcha hit during
+implementation**: an early version rendered the immersive layout as a
+*separate* JSX subtree (two early-returns) — toggling immersive on
+unmounted the div that native `requestFullscreen()` had just been called
+on, which the browser treats as "fullscreen was exited" and immediately
+fired `fullscreenchange`, snapping back to normal before the user ever saw
+it. Fixed by keeping one persistent container across both states, only
+restyled (not remounted) by the `immersive` flag. `Escape` and the
+browser's own fullscreen-exit gestures (F11, Android swipe-down) are also
+handled — a `fullscreenchange` listener syncs `immersive` back to `false`
+if the browser exits fullscreen by some path other than the toggle button.
+Page position/navigation state carries over across entering/exiting.
+Verified with Playwright: entering shows the black immersive layout with
+working prev/next controls, exiting restores the normal page layout with
+the current page number preserved.
+
+**Swipe-to-turn-page (added 2026-08-12)**: requested specifically for
+mobile fullscreen reading. `onTouchStart`/`onTouchEnd` on the page-canvas
+wrapper (works in both immersive and normal layout, same handlers) compare
+start/end touch X/Y: a horizontal move past a 50px threshold that's more
+horizontal than vertical (so an ordinary vertical scroll/tap isn't
+misread) triggers a page turn — right-to-left → next page, left-to-right →
+previous, matching the direction convention of every mainstream mobile
+reader/gallery app. `touchAction: 'pan-y'` on that same element tells the
+browser vertical panning is still native while horizontal drags are ours
+to interpret, which also avoids fighting Safari's edge-swipe
+back/forward-navigation gesture. Verified with Playwright's iPhone 13
+emulation profile (synthetic `TouchEvent`s dispatched directly, since
+Playwright has no built-in swipe helper): right-to-left advanced 1→2,
+left-to-right returned 2→1, and a sub-threshold jitter correctly left the
+page unchanged.
+
+**Landscape fullscreen fills screen width (added 2026-08-12)**: previously
+fullscreen always height-capped the canvas (`maxHeight: calc(100vh -
+72px)`), which on a landscape phone (short viewport, portrait-shaped page)
+left the page narrow with black bars on the sides — the opposite of what
+fullscreen is for. Now tracked via `isLandscape`
+(`window.matchMedia('(orientation: landscape)')`, re-checked on a
+`change` listener so a physical rotation updates it live): in landscape
+immersive mode the canvas switches to `width: 100%` with no height cap, so
+it fills the screen's width and the page runs taller than the viewport
+instead. The immersive container's `justifyContent` switches from
+`center` to `flex-start` with `overflowY: auto` in that case specifically
+— centering a flex item that overflows its container can leave the start
+of the content unreachable by scroll in some browsers, top-aligning
+avoids that class of bug entirely. Portrait fullscreen is unchanged
+(still height-capped and centered, since the whole page already fits).
+Same change moved the prev/next/page-counter/fullscreen-toggle controls
+from the normal document flow to a `position: fixed` translucent bar
+pinned to the bottom of the viewport whenever immersive — needed once the
+page can scroll past the fold in landscape, otherwise the controls would
+scroll out of reach along with it; extra bottom padding on the scrollable
+area keeps the last part of a scrolled page from hiding behind that bar.
+Swipe navigation (previous entry) works unchanged in both orientations,
+same handlers. Verified with Playwright's `'iPhone 13 landscape'` device
+profile: canvas width matched the viewport width exactly (749.98px vs
+750px), scrolling revealed the rest of the page with the control bar
+staying fixed on top, and a swipe still advanced the page correctly.
+
+**Zoom in fullscreen (added 2026-08-12)**: `ZoomInOutlined`/`ZoomOutOutlined`
+buttons in the fullscreen control bar, `zoom` state from `ZOOM_MIN=1`
+(fit-to-screen) to `ZOOM_MAX=3` in `ZOOM_STEP=0.25` increments, disabled
+at each bound like the prev/next buttons. The canvas's fit-to-screen width
+is now computed in real pixels rather than CSS percentages specifically so
+zoom can just multiply it: landscape's fit width is `window.innerWidth`,
+portrait's is derived from the loaded image's own aspect ratio
+(`naturalSize`, captured in the page-load `useEffect` alongside the
+existing `drawImage` call) against the height cap — `zoom` is then just
+`fitWidthPx * zoom`. `flexShrink: 0` on the canvas prevents the wrapper's
+default flex-shrink from squeezing an oversized zoomed canvas back down
+(a real flexbox pitfall with replaced elements, not hypothetical — worth
+keeping if this component is touched again). The immersive
+container's scroll/alignment logic (previously keyed only on `isLandscape`,
+see the "Landscape fullscreen" entry above) now keys on a broader
+`scrollable = isLandscape || zoom > 1`, since zooming in can push a
+portrait page past the viewport in both dimensions, not just landscape's
+width-fill — same top/left-align-instead-of-center reasoning applies to
+both axes now, not just the vertical one. `touchAction` on the page
+wrapper switches from `'pan-y'` to `'auto'` while zoomed, handing both-
+axis panning to native browser scrolling.
+
+**Swipe-to-turn-page is suppressed while zoomed** (`zoom !== 1` checked in
+`onTouchEnd`, added by explicit request) — the reasoning being that a
+horizontal drag on a zoomed-in page is someone panning across it to read
+different areas, not asking to turn the page. Zoom resets to 1 on page
+change, on an orientation change, and on exiting fullscreen — the fit
+calculation is per-layout, so it can't be preserved sensibly across any of
+those; the reset is what stops it, not any of the size math changing
+underneath the user unexpectedly. **Loading state** was changed the same
+session from an antd `Skeleton.Image` placeholder to a `Spin` (the
+rotating-dots loader) — requested because the skeleton read as "this looks
+like a broken image," `Spin` unambiguously reads as "loading," centered
+inside the same 2:3 aspect-ratio placeholder box so there's no layout jump
+once the real page image arrives. Verified with Playwright (mobile
+viewport, `hasTouch: true`, route interception adding a 1.5s delay to page
+image responses so the spinner state is actually observable instead of
+flashing by on localhost): `Spin` visible during the delayed load; two
+zoom-in clicks scaled canvas width from 476px to 714px (exactly 1.5×, i.e.
+zoom 1.0 → 1.5 in 0.25 steps); a swipe while zoomed left the page
+unchanged; zooming back to 1.0 restored the exact original 476px width;
+a swipe at that point correctly advanced the page; and the zoom-out button
+was correctly disabled once back at the minimum.
 
 ## Bulk ZIP download (added 2026-08-11)
 

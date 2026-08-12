@@ -18,6 +18,14 @@ AUDIO_DIR = os.path.expanduser("~/Desktop/अमृतकण")
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 FRONTEND_DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
 ZIP_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zip-cache")
+# Source PDFs live outside the repo (this repo is public — see "AmrutkanSite
+# repo renamed+public" — a PDF or a full-resolution page render would be
+# trivially redistributable if it ever ended up in git history), same
+# convention as AUDIO_DIR. build_pustak_cache.py reads from here and renders
+# into PUSTAK_CACHE_DIR (gitignored); app.py only ever serves one rendered
+# page image at a time out of that cache, never the source PDF.
+PUSTAK_SOURCE_DIR = os.path.expanduser("~/Desktop/पुस्तके")
+PUSTAK_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pustak-cache")
 ACCESS_LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "access.log")
 PORT = 8080
 CHUNK_SIZE = 64 * 1024
@@ -60,6 +68,21 @@ BOOK_DEFS = [
     {"id": "changdev", "prefix": "श्री चांगदेव पासष्टी", "name": "श्री चांगदेव पासष्टी", "unit": "ओवी"},
 ]
 BOOKS_BY_ID = {b["id"]: b for b in BOOK_DEFS}
+
+# Digital-reader books (separate from the audio BOOK_DEFS above). Rendered
+# to per-page JPEGs by build_pustak_cache.py; served one page at a time via
+# /pustak/<id>/page/<n>.jpg — see "Digital book reader" further down.
+PUSTAK_DEFS = [
+    {"id": "sopee-geeta", "title": "सोपी गीता", "author": "सुरेश चौधरी", "source": "सोपी गीता.pdf"},
+    {
+        "id": "chaitanya-sagar",
+        "title": "चैतन्य सागर",
+        "subtitle": "ज्ञानेश्वरी ग्रंथ का हिन्दी सारांश",
+        "author": "डॉ. सुरेश चौधरी",
+        "source": "चैतन्य सागर.pdf",
+    },
+]
+PUSTAK_BY_ID = {b["id"]: b for b in PUSTAK_DEFS}
 
 # Official logo path data + brand colors sourced from simple-icons (simpleicons.org),
 # an open-source library of accurate brand marks. Verified brand colors against
@@ -458,6 +481,30 @@ def api_home():
     }
 
 
+def api_pustake():
+    """Digital-reader book list — pages are served one at a time as JPEGs
+    via /pustak/<id>/page/<n>.jpg (rendered ahead of time by
+    build_pustak_cache.py), never the source PDF, so there's no single file
+    a visitor can save/spoof-download to get the whole book."""
+    books = []
+    for b in PUSTAK_DEFS:
+        cache_dir = os.path.join(PUSTAK_CACHE_DIR, b["id"])
+        page_count = 0
+        if os.path.isdir(cache_dir):
+            page_count = sum(1 for f in os.listdir(cache_dir) if f.startswith("page-") and f.endswith(".jpg"))
+        books.append(
+            {
+                "id": b["id"],
+                "title": b["title"],
+                "subtitle": b.get("subtitle", ""),
+                "author": b["author"],
+                "pageCount": page_count,
+                "thumbnailUrl": f"/pustak/{b['id']}/page/1.jpg" if page_count else "",
+            }
+        )
+    return {"books": books}
+
+
 def api_library():
     """Full library tree as JSON — consumed by both the React web frontend
     and the native AmrutkanApp (Expo/React Native), which can't scrape HTML."""
@@ -587,6 +634,14 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
                 self.serve_json(api_library())
             elif parts[0] == "api" and len(parts) == 2 and parts[1] == "home":
                 self.serve_json(api_home())
+            elif parts[0] == "api" and len(parts) == 2 and parts[1] == "pustake":
+                self.serve_json(api_pustake())
+            elif parts[0] == "pustak" and len(parts) == 4 and parts[2] == "page":
+                self.serve_pustak_page(parts[1], parts[3])
+            elif parts[0] == "pustak" and len(parts) == 2:
+                if parts[1] not in PUSTAK_BY_ID:
+                    raise LookupError(parts[1])
+                self.serve_spa_page(PUSTAK_BY_ID[parts[1]]["title"])
             elif parts[0] == "download" and len(parts) == 3 and parts[1] == "book":
                 display_name, items = build_book_zip_items(parts[2])
                 cached = os.path.join(ZIP_CACHE_DIR, "book", f"{parts[2]}.zip")
@@ -730,6 +785,37 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "public, max-age=86400")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def serve_pustak_page(self, book_id, filename):
+        """Serves exactly one pre-rendered page image, never the source PDF
+        and never a directory listing/zip of the whole book — the reader
+        frontend requests one page at a time as it's viewed. No
+        Content-Disposition is set, so browsers render it inline like any
+        other <img>, not as a download prompt."""
+        if book_id not in PUSTAK_BY_ID or not filename.endswith(".jpg"):
+            self.send_error(404)
+            return
+        try:
+            page_num = int(filename[: -len(".jpg")])
+        except ValueError:
+            self.send_error(404)
+            return
+        if page_num < 1:
+            self.send_error(404)
+            return
+        filepath = os.path.join(PUSTAK_CACHE_DIR, book_id, f"page-{page_num:04d}.jpg")
+        if not os.path.isfile(filepath):
+            self.send_error(404)
+            return
+        with open(filepath, "rb") as f:
+            data = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/jpeg")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "private, max-age=3600")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(data)
 

@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import { fetchPustake, type PustakBook } from '../api'
 import { toDevanagari } from '../devanagari'
+import { loadPustakPage, savePustakPage } from '../pustakProgress'
 
 // Pages are drawn into a <canvas> rather than an <img> — a canvas has no
 // built-in "Save image as…"/drag-out affordance, and pairing it with
@@ -20,7 +21,11 @@ import { toDevanagari } from '../devanagari'
 export default function PustakPage() {
   const { bookId } = useParams<{ bookId: string }>()
   const [book, setBook] = useState<PustakBook | null | undefined>(undefined)
-  const [page, setPage] = useState(1)
+  // Resume where you left off, same idea as the audio player's ak_playback
+  // — read synchronously from localStorage so the first-ever page fetch is
+  // already for the right page (no flash of page 1 while a "jump to saved
+  // page" correction effect kicks in after the book metadata loads).
+  const [page, setPage] = useState(() => loadPustakPage(bookId) ?? 1)
   const [imageLoaded, setImageLoaded] = useState(false)
   // "Immersive" is a CSS full-viewport style on the (always-mounted)
   // readerRef container — the source of truth for the bigger-page layout,
@@ -56,8 +61,20 @@ export default function PustakPage() {
   }, [bookId])
 
   useEffect(() => {
-    setPage(1)
+    setPage(loadPustakPage(bookId) ?? 1)
   }, [bookId])
+
+  // Defensive clamp only — the lazy useState initializer and the effect
+  // above already cover the normal case. This just guards against a saved
+  // page number that's out of range for the book as it exists now (e.g. a
+  // book was re-rendered with fewer pages after the save happened).
+  useEffect(() => {
+    if (book && page > book.pageCount) setPage(book.pageCount)
+  }, [book, page])
+
+  useEffect(() => {
+    if (book) savePustakPage(book.id, page)
+  }, [book, page])
 
   useEffect(() => {
     if (!book) return

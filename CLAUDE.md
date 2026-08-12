@@ -592,6 +592,30 @@ zoom-in too), manually set it to `(300, 150)` to simulate a pan, zoomed
 back out 3 steps, and confirmed scroll was `(0, 0)` again with the page
 correctly centered and fully in frame in the screenshot.
 
+**Resume last-read page (added 2026-08-12)**: requested as the reading
+equivalent of the audio player's "resume where you left off"
+(`ak_playback`/`ak_progress` in `player/PlayerContext.tsx`/
+`continueListening.ts`). `frontend/src/pustakProgress.ts` —
+`loadPustakPage`/`savePustakPage`, one `localStorage` key
+(`ak_pustak_progress`) holding a single `{bookId: pageNumber}` object
+rather than a per-book key, since there are only ever a couple of books.
+`page` state's `useState` initializer reads synchronously from
+`localStorage` (`loadPustakPage(bookId) ?? 1`) rather than always starting
+at 1 and correcting in an effect afterward — the difference matters
+because correcting afterward would mean the *first* page-image fetch is
+already for the wrong page, both wasting a request and flashing page 1 on
+screen before jumping to the resumed page. Saved on every page change
+once book metadata is loaded (page turns are infrequent discrete actions,
+unlike audio's periodic 5s ticker — no throttling needed). A defensive
+clamp effect guards against a saved page number that's out of range for
+the book as it currently exists (e.g. if a book were ever re-rendered
+with fewer pages after the save happened). Verified with Playwright:
+fresh visit started at page 1, navigating to page 25 wrote
+`{"chaitanya-sagar":25}` to `localStorage`, a full page reload (not
+client-side nav) resumed at page 25, and navigating to the *other* book
+correctly started at page 1 rather than inheriting the first book's saved
+position.
+
 ## Bulk ZIP download (added 2026-08-11)
 
 Every book page (`/book/<id>`) and chapter page (`/book/<id>/<slug>`) has a

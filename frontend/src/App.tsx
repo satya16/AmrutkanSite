@@ -166,7 +166,7 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
           paddingBottom: player.currentSrc ? MINI_BAR_CLEARANCE : 24,
         }}
       >
-        <div>जय जय राम कृष्ण हरी</div>
+        <div>॥ राम कृष्ण हरी ॥</div>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           © {new Date().getFullYear()} अमृतकण. सर्व हक्क राखीव.
         </Typography.Text>

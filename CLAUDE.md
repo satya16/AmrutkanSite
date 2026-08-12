@@ -573,6 +573,25 @@ unchanged; zooming back to 1.0 restored the exact original 476px width;
 a swipe at that point correctly advanced the page; and the zoom-out button
 was correctly disabled once back at the minimum.
 
+**Bugfix: zooming out after panning left a weird off-center view (fixed
+2026-08-12)**: reported by the user on mobile — zoom in, touch-pan to some
+other part of the page, zoom back out, and the view landed somewhere
+off-center/wrong instead of back on the fit-to-screen page. Root cause:
+panning sets the immersive container's `scrollTop`/`scrollLeft` to
+whatever arbitrary position the user dragged to, and that raw scroll
+offset was never reset — so when zoom changed and the canvas resized
+underneath it, the *same* leftover pixel offset now pointed at a
+completely different part of the (now differently-sized) content. Fixed
+with a `useEffect` keyed on `[page, isLandscape, zoom]` that snaps
+`readerRef`'s `scrollTop`/`scrollLeft` back to `0, 0` on every one of
+those transitions — each new page/orientation/zoom now always starts from
+a known top-left position instead of inheriting a stale offset computed
+for a different size. Verified with Playwright: zoomed in 3 steps,
+confirmed scroll was `(0, 0)` right after (the reset already firing on
+zoom-in too), manually set it to `(300, 150)` to simulate a pan, zoomed
+back out 3 steps, and confirmed scroll was `(0, 0)` again with the page
+correctly centered and fully in frame in the screenshot.
+
 ## Bulk ZIP download (added 2026-08-11)
 
 Every book page (`/book/<id>`) and chapter page (`/book/<id>/<slug>`) has a

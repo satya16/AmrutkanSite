@@ -146,6 +146,23 @@ export default function PustakPage() {
     setZoom(1)
   }, [page, isLandscape])
 
+  // Panning around a zoomed-in page leaves the container scrolled to some
+  // arbitrary (scrollLeft, scrollTop). If that offset survives a zoom
+  // change, resizing the canvas underneath it re-anchors the same raw
+  // scroll numbers to a completely different part of the (now smaller or
+  // larger) content — that's the "zooming out lands on a weird
+  // off-center view" bug. Snapping scroll back to the top-left on every
+  // page/orientation/zoom change keeps each new size starting from a
+  // known, consistent position instead of an offset computed for a
+  // different size.
+  useEffect(() => {
+    const el = readerRef.current
+    if (el) {
+      el.scrollTop = 0
+      el.scrollLeft = 0
+    }
+  }, [page, isLandscape, zoom])
+
   // Keeps our state in sync if the *browser's* fullscreen is exited some
   // other way (Esc, F11, swipe-down on Android) instead of our own button.
   useEffect(() => {

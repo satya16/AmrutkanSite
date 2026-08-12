@@ -86,7 +86,9 @@ ABOUT_TEXT_MR = (
     "संतांनी मोक्षाच्या मार्गावर अत्यंत उच्च आध्यात्मिक मूल्ये रुजवली. या पवित्र "
     "आणि पावन आत्म्यांचे महान कार्य आजच्या धकाधकीच्या जीवनाला साजेशा छोट्या "
     "क्लिप्सच्या स्वरूपात पोहोचवण्याचा अमृतकणचा हा एक छोटासा प्रयत्न आहे. चला, "
-    "अमृतकणसोबत या आध्यात्मिक प्रवासाला सुरुवात करूया."
+    "अमृतकणसोबत या आध्यात्मिक प्रवासाला सुरुवात करूया. हे सर्व निरूपण घरच्या "
+    "घरी, कोणत्याही व्यावसायिक स्टुडिओशिवाय, भक्तिभावाने ध्वनिमुद्रित व निर्मित "
+    "केले आहे."
 )
 
 ABOUT_ME_TEXT_MR = (
@@ -230,6 +232,86 @@ GA_SNIPPET = f"""<script async src="https://www.googletagmanager.com/gtag/js?id=
   gtag('js', new Date());
   gtag('config', '{GA_MEASUREMENT_ID}');
 </script>"""
+
+PRIVACY_CONTACT_EMAIL = "support@amrutkan.org"
+PRIVACY_LAST_UPDATED = "August 2026"
+
+PRIVACY_POLICY_HTML = f"""<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — अमृतकण</title>
+<meta name="description" content="Privacy policy for the Amrutkan website and Android app.">
+<link rel="icon" href="/static/mauli.jpg?v=2" type="image/jpeg">
+<link rel="apple-touch-icon" href="/static/mauli.jpg?v=2">
+{GA_SNIPPET}
+<style>
+  body {{
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 20px 64px;
+    line-height: 1.6;
+    color: #1f1f1f;
+  }}
+  h1 {{ color: #b5541a; margin-bottom: 4px; }}
+  h2 {{ color: #b5541a; margin-top: 36px; }}
+  .updated {{ color: #777; margin-top: 0; margin-bottom: 32px; }}
+  a {{ color: #b5541a; }}
+  ul {{ padding-left: 20px; }}
+</style>
+</head>
+<body>
+<h1>Privacy Policy</h1>
+<p class="updated">Amrutkan (अमृतकण) — last updated {PRIVACY_LAST_UPDATED}</p>
+
+<p>Amrutkan is a hobby project that streams Marathi spiritual audio
+narrations (Dnyaneshwari and Changdev Pashashti discourses) through the
+website at <a href="https://amrutkan.org">amrutkan.org</a> and a companion
+Android app. This page explains what data the website and app access, and
+what they don't.</p>
+
+<h2>What we don't collect</h2>
+<p>There are no user accounts, no sign-in, and no payment or personal
+information collected anywhere in the website or app. You can browse,
+stream, and download every episode without providing any personal details.</p>
+
+<h2>What the app accesses</h2>
+<ul>
+<li><strong>Network access</strong> — to fetch the list of books/episodes
+and to stream or download audio files from amrutkan.org.</li>
+<li><strong>Notification permission</strong> — used only to show the
+playback control notification while audio is playing (standard Android
+media-player behavior). It is not used for marketing or any other purpose.</li>
+<li><strong>Local storage</strong> — episodes you choose to download are
+saved to your device's storage so they can play back offline. This stays on
+your device; nothing is uploaded from it.</li>
+</ul>
+<p>The app does not include any advertising or analytics software, and does
+not share any data with third parties.</p>
+
+<h2>What the website accesses</h2>
+<p>The website uses <a href="https://policies.google.com/privacy"
+target="_blank" rel="noopener">Google Analytics</a> to understand aggregate
+traffic (e.g. how many people visit, which pages are popular). This relies
+on cookies/device identifiers and is standard, anonymized-at-our-end usage
+analytics — it is not used to build advertising profiles. You can control
+this via your browser's cookie/tracking settings.</p>
+
+<h2>Children's privacy</h2>
+<p>Amrutkan is not directed at children and does not knowingly collect
+personal information from anyone, including children under 13.</p>
+
+<h2>Changes to this policy</h2>
+<p>If this policy changes, the update will be posted on this same page.</p>
+
+<h2>Contact</h2>
+<p>Questions about this policy or how Amrutkan handles data can be sent to
+<a href="mailto:{PRIVACY_CONTACT_EMAIL}">{PRIVACY_CONTACT_EMAIL}</a>.</p>
+
+</body>
+</html>"""
 
 _ASSET_TAG_RE = re.compile(r'<(?:script|link)[^>]+/assets/[^>]+>(?:</script>)?')
 
@@ -437,6 +519,8 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
         try:
             if not parts:
                 self.serve_spa_page("अमृतकण")
+            elif parts[0] == "privacy" and len(parts) == 1:
+                self.serve_html(PRIVACY_POLICY_HTML)
             elif parts[0] == "static" and len(parts) == 2:
                 self.serve_static(parts[1])
             elif parts[0] == "assets" and len(parts) == 2:

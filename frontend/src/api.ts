@@ -48,8 +48,12 @@ export interface PustakList {
 export interface HomeContent {
   tagline: string
   siteDescription: string
+  tilakImage: string
+  tilakText: string
   heroImage: string
+  aboutHeading: string
   aboutText: string
+  aboutMeHeading: string
   aboutMePhoto: string
   aboutMeText: string
   podcastLinks: PodcastLink[]

@@ -61,6 +61,14 @@ export default function Home() {
       <Section background={token.colorBgContainer}>
         <div style={{ textAlign: 'center' }}>
           <img
+            src={home.tilakImage}
+            alt="तिलक"
+            style={{ width: 12, height: 'auto', marginBottom: 8 }}
+          />
+          <Typography.Paragraph style={{ fontWeight: 600, marginBottom: 16 }}>
+            {home.tilakText}
+          </Typography.Paragraph>
+          <img
             src={home.heroImage}
             alt="श्री ज्ञानेश्वर माऊली"
             style={{ width: 120, height: 120, borderRadius: '50%', objectFit: 'cover' }}
@@ -191,9 +199,10 @@ export default function Home() {
       {/* About: alternates tint again so it reads distinct from पुस्तके above it. */}
       <Section background={token.colorFillAlter}>
         <Typography.Title level={2} style={{ textAlign: 'center' }}>
-          आमच्याबद्दल
+          {home.aboutHeading}
         </Typography.Title>
         <Typography.Paragraph>{home.aboutText}</Typography.Paragraph>
+        <Typography.Title level={3}>{home.aboutMeHeading}</Typography.Title>
         {/* display: flow-root (not overflow: hidden) so the container
             properly contains the floated image without any risk of
             clipping — the modern, side-effect-free way to contain a float. */}

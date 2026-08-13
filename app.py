@@ -264,7 +264,7 @@ def build_library():
 
 LIBRARY = build_library()
 
-SITE_DESCRIPTION = "ज्ञानेश्वरी आणि इतर मराठी ग्रंथांचं निरूपण — ध्वनिरूपात ऐका"
+SITE_DESCRIPTION = "ज्ञानेश्वरी आणि इतर मराठी ग्रंथांचे निरूपण — ध्वनिरूपात ऐका"
 
 GA_MEASUREMENT_ID = "G-KLHSC2QRRW"
 GA_SNIPPET = f"""<script async src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"></script>
@@ -466,7 +466,7 @@ def api_home():
     """Static home-page content (about text, podcast/YouTube links) as JSON,
     consumed by the React web frontend's Home page."""
     return {
-        "tagline": "ज्ञानेश्वरी आणि इतर मराठी ग्रंथांचं निरूपण",
+        "tagline": "ज्ञानेश्वरी आणि इतर मराठी ग्रंथांचे निरूपण",
         "siteDescription": SITE_DESCRIPTION,
         "heroImage": "/static/mauli.jpg?v=2",
         "aboutText": ABOUT_TEXT_MR,

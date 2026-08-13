@@ -2,6 +2,7 @@ export interface Episode {
   filename: string
   label: string
   audioUrl: string
+  sizeBytes: number
 }
 
 export interface Chapter {
@@ -10,6 +11,7 @@ export interface Chapter {
   isSpecial: boolean
   episodeCount: number
   episodes: Episode[]
+  zipSizeBytes: number | null
 }
 
 export interface Book {
@@ -18,6 +20,7 @@ export interface Book {
   unit: string
   totalEpisodes: number
   chapters: Chapter[]
+  zipSizeBytes: number | null
 }
 
 export interface Library {

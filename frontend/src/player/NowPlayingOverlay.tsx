@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Button, Drawer, Dropdown, Popover, Slider, Space, Typography, theme as antdTheme } from 'antd'
 import type { MenuProps } from 'antd'
 import type { ReactNode } from 'react'
@@ -28,6 +29,8 @@ function SkipIcon({ icon, label }: { icon: ReactNode; label: string }) {
   )
 }
 import { SPEED_PRESETS, formatTime, usePlayer } from './PlayerContext'
+import { fetchLibrary, type Library } from '../api'
+import { useDownloadConfirm } from '../useDownloadConfirm'
 
 const SLEEP_OPTIONS: { value: 'episode' | number | 'off'; label: string }[] = [
   { value: 'episode', label: 'भाग संपल्यावर' },
@@ -41,6 +44,15 @@ const SLEEP_OPTIONS: { value: 'episode' | number | 'off'; label: string }[] = [
 export default function NowPlayingOverlay() {
   const player = usePlayer()
   const { token } = antdTheme.useToken()
+  const confirmDownload = useDownloadConfirm()
+  // Fetched once on mount (this component is mounted once at the app root,
+  // not per-open) purely to look up the currently-playing episode's size for
+  // the download-confirmation dialog below — the player itself only tracks
+  // src/label/subtitle, not file size.
+  const [library, setLibrary] = useState<Library | null>(null)
+  useEffect(() => {
+    fetchLibrary().then(setLibrary)
+  }, [])
   if (!player.currentSrc) return null
 
   const bufferedPct = player.duration ? (player.buffered / player.duration) * 100 : 0
@@ -61,6 +73,10 @@ export default function NowPlayingOverlay() {
   }
 
   const filename = decodeURIComponent(player.currentSrc.split('/').pop() || '')
+  const sizeBytes = library?.books
+    .flatMap((b) => b.chapters)
+    .flatMap((c) => c.episodes)
+    .find((e) => e.filename === filename)?.sizeBytes
 
   return (
     <Drawer
@@ -165,7 +181,10 @@ export default function NowPlayingOverlay() {
           <Dropdown menu={sleepMenu} trigger={['click']}>
             <Button>{player.sleepLabel}</Button>
           </Dropdown>
-          <Button icon={<DownloadOutlined />} href={player.currentSrc} download={filename}>
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={() => confirmDownload(player.currentLabel, sizeBytes, player.currentSrc!, filename)}
+          >
             डाउनलोड
           </Button>
           <Popover

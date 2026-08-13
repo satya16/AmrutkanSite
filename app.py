@@ -514,6 +514,15 @@ def api_pustake():
     return {"books": books}
 
 
+def cached_zip_size(*parts):
+    """Size in bytes of a pre-built ZIP under zip-cache/ (see build_zip_cache.py),
+    or None if that entry hasn't been cached — lets the frontend show a real
+    size upfront in the download-confirmation dialog without a HEAD round-trip,
+    while still degrading gracefully for an uncached book/chapter."""
+    path = os.path.join(ZIP_CACHE_DIR, *parts)
+    return os.path.getsize(path) if os.path.isfile(path) else None
+
+
 def api_library():
     """Full library tree as JSON — consumed by both the React web frontend
     and the native AmrutkanApp (Expo/React Native), which can't scrape HTML."""
@@ -536,6 +545,7 @@ def api_library():
                     "filename": filename,
                     "label": ep_label,
                     "audioUrl": f"/audio/{urllib.parse.quote(filename)}",
+                    "sizeBytes": os.path.getsize(FILES_BY_NAME[filename]),
                 }
                 for filename, ep_label in items
             ]
@@ -545,6 +555,7 @@ def api_library():
                 "isSpecial": is_special,
                 "episodeCount": len(items),
                 "episodes": episodes,
+                "zipSizeBytes": cached_zip_size("book", book["id"], f"{slug}.zip"),
             })
         books.append({
             "id": book["id"],
@@ -552,6 +563,7 @@ def api_library():
             "unit": lib["unit"],
             "totalEpisodes": sum(len(v) for v in lib["chapters"].values()),
             "chapters": chapters,
+            "zipSizeBytes": cached_zip_size("book", f"{book['id']}.zip"),
         })
     return {"books": books, "artworkUrl": "/static/mauli.jpg?v=2"}
 

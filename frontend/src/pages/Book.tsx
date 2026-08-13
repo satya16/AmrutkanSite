@@ -4,10 +4,12 @@ import { Breadcrumb, Button, Card, Col, Result, Row, Typography } from 'antd'
 import { DownloadOutlined, FolderOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { fetchLibrary, type Book, type Library } from '../api'
 import { toDevanagari } from '../devanagari'
+import { useDownloadConfirm } from '../useDownloadConfirm'
 
 export default function BookPage() {
   const { bookId } = useParams<{ bookId: string }>()
   const [library, setLibrary] = useState<Library | null>(null)
+  const confirmDownload = useDownloadConfirm()
 
   useEffect(() => {
     fetchLibrary().then(setLibrary)
@@ -49,8 +51,9 @@ export default function BookPage() {
       <Typography.Title level={2}>{book.name}</Typography.Title>
       <Button
         icon={<DownloadOutlined />}
-        href={`/download/book/${book.id}`}
-        download={`${book.id}.zip`}
+        onClick={() =>
+          confirmDownload(`संपूर्ण ${book.name} (ZIP)`, book.zipSizeBytes, `/download/book/${book.id}`, `${book.id}.zip`)
+        }
         style={{ marginBottom: 16 }}
       >
         संपूर्ण ग्रंथ डाउनलोड करा (ZIP)

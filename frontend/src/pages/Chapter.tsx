@@ -6,11 +6,13 @@ import { fetchLibrary, type Book, type Chapter, type Library } from '../api'
 import { usePlayer } from '../player/PlayerContext'
 import { buildBookPlaylist } from '../bookPlaylist'
 import { ACCENT } from '../theme'
+import { useDownloadConfirm } from '../useDownloadConfirm'
 
 export default function ChapterPage() {
   const { bookId, slug } = useParams<{ bookId: string; slug: string }>()
   const [library, setLibrary] = useState<Library | null>(null)
   const player = usePlayer()
+  const confirmDownload = useDownloadConfirm()
 
   useEffect(() => {
     fetchLibrary().then(setLibrary)
@@ -59,8 +61,14 @@ export default function ChapterPage() {
       <Typography.Title level={2}>{chapter.label}</Typography.Title>
       <Button
         icon={<DownloadOutlined />}
-        href={`/download/book/${book.id}/${chapter.slug}`}
-        download={`${book.id}-${chapter.slug}.zip`}
+        onClick={() =>
+          confirmDownload(
+            `संपूर्ण ${chapter.label} (ZIP)`,
+            chapter.zipSizeBytes,
+            `/download/book/${book.id}/${chapter.slug}`,
+            `${book.id}-${chapter.slug}.zip`,
+          )
+        }
         style={{ marginBottom: 16 }}
       >
         संपूर्ण {chapter.label} डाउनलोड करा (ZIP)
@@ -95,10 +103,12 @@ export default function ChapterPage() {
               actions={[
                 <a
                   key="dl"
-                  href={episode.audioUrl}
-                  download={episode.filename}
                   aria-label="डाउनलोड करा"
-                  onClick={(e) => e.stopPropagation()}
+                  style={{ cursor: 'pointer' }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    confirmDownload(episode.label, episode.sizeBytes, episode.audioUrl, episode.filename)
+                  }}
                 >
                   <DownloadOutlined />
                 </a>,

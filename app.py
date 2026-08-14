@@ -474,7 +474,7 @@ def api_home():
         "tagline": "ज्ञानेश्वरी आणि इतर मराठी ग्रंथांचे भावपूर्ण निरूपण",
         "siteDescription": SITE_DESCRIPTION,
         "tilakImage": "/static/tilak.png",
-        "tilakText": "|| राम कृष्ण हरी ||",
+        "tilakText": "|| रामकृष्ण हरी ||",
         "heroImage": "/static/mauli.jpg?v=2",
         "aboutHeading": ABOUT_HEADING_MR,
         "aboutText": ABOUT_TEXT_MR,

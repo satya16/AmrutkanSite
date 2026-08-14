@@ -204,7 +204,7 @@ SPECIAL_CHAPTER_ORDER = {
             ("श्री ज्ञानेश्वरांचे संक्षिप्त चरित्र", "dnyaneshwar_charitra"),
             ("सारांश", "saransh"),
         ],
-        "trail": [],
+        "trail": [("ओवी गायन", "ovi_gaayan")],
     },
 }
 

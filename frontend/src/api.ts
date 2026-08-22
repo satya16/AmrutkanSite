@@ -35,6 +35,11 @@ export interface PodcastLink {
   path: string
 }
 
+export interface PustakChapter {
+  title: string
+  page: number
+}
+
 export interface PustakBook {
   id: string
   title: string
@@ -42,6 +47,7 @@ export interface PustakBook {
   author: string
   pageCount: number
   thumbnailUrl: string
+  chapters: PustakChapter[]
 }
 
 export interface PustakList {

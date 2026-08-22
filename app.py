@@ -73,13 +73,68 @@ BOOKS_BY_ID = {b["id"]: b for b in BOOK_DEFS}
 # to per-page JPEGs by build_pustak_cache.py; served one page at a time via
 # /pustak/<id>/page/<n>.jpg — see "Digital book reader" further down.
 PUSTAK_DEFS = [
-    {"id": "sopee-geeta", "title": "सोपी गीता", "author": "सुरेश चौधरी", "source": "सोपी गीता.pdf"},
+    {
+        "id": "sopee-geeta",
+        "title": "सोपी गीता",
+        "author": "डॉ. सुरेश कुमार चौधरी",
+        "source": "सोपी गीता.pdf",
+        # Chapter -> reader page number, read directly off the book's own
+        # अनुक्रमणिका (PDF page 8) and cross-checked against a few chapter
+        # headings further in — the PDF has 8 unnumbered front-matter pages
+        # before the book's own page "1", so reader page = book's printed
+        # page + 8 (verified: book page 1 -> PDF/reader page 9, book page 7
+        # -> reader page 15, book page 16 -> reader page 24, book page 22 ->
+        # reader page 30).
+        "chapters": [
+            {"title": "अध्याय १ - अर्जुनाचे दुःख", "page": 9},
+            {"title": "अध्याय २ - सांख्ययोगाचे सिद्धांत", "page": 15},
+            {"title": "अध्याय ३ - कर्माचे सिद्धांत", "page": 24},
+            {"title": "अध्याय ४ - ज्ञान आणि कर्म संन्यास", "page": 30},
+            {"title": "अध्याय ५ - कर्माचा संन्यास", "page": 36},
+            {"title": "अध्याय ६ - अष्टांगयोगाचे सिद्धांत", "page": 40},
+            {"title": "अध्याय ७ - ज्ञान आणि विज्ञान", "page": 47},
+            {"title": "अध्याय ८ - अक्षर ब्रम्ह", "page": 51},
+            {"title": "अध्याय ९ - भक्तीचे गुह्य", "page": 55},
+            {"title": "अध्याय १० - परमात्म्याच्या विभूती", "page": 60},
+            {"title": "अध्याय ११ - विश्वरुप दर्शन", "page": 66},
+            {"title": "अध्याय १२ - ज्ञानोत्तर भक्ती", "page": 74},
+            {"title": "अध्याय १३ - क्षेत्र आणि क्षेत्रज्ञाचा विचार", "page": 77},
+            {"title": "अध्याय १४ - तीन गुणांची विभागणी", "page": 82},
+            {"title": "अध्याय १५ - सर्वश्रेष्ठ पुरुषोत्तम", "page": 86},
+            {"title": "अध्याय १६ - दैवी आणि आसुरी संपदा", "page": 89},
+            {"title": "अध्याय १७ - त्रिश्रद्धा विभागणी", "page": 93},
+            {"title": "अध्याय १८ - गीतेचे गुह्य ज्ञान", "page": 97},
+        ],
+    },
     {
         "id": "chaitanya-sagar",
         "title": "चैतन्य सागर",
         "subtitle": "ज्ञानेश्वरी ग्रंथ का हिन्दी सारांश",
-        "author": "डॉ. सुरेश चौधरी",
+        "author": "डॉ. सुरेश कुमार चौधरी",
         "source": "चैतन्य सागर.pdf",
+        # Same idea as sopee-geeta's chapters above, but this PDF's own
+        # printed page numbers already match the reader/PDF page 1:1 (no
+        # offset) — verified: book/printed page 11 -> PDF page 11.
+        "chapters": [
+            {"title": "अध्याय-1 - अर्जुन का विषाद", "page": 11},
+            {"title": "अध्याय-2 - सांख्ययोग के सिद्धांत", "page": 15},
+            {"title": "अध्याय-3 - कर्म के सिद्धांत", "page": 21},
+            {"title": "अध्याय-4 - ज्ञान एवम् कर्मसंन्यास", "page": 27},
+            {"title": "अध्याय-5 - कर्मसंन्यास का विस्तार", "page": 32},
+            {"title": "अध्याय-6 - अष्टांगयोग के सिद्धांत", "page": 37},
+            {"title": "अध्याय-7 - ज्ञान तथा विज्ञान", "page": 43},
+            {"title": "अध्याय-8 - अक्षर ब्रह्म", "page": 49},
+            {"title": "अध्याय-9 - भक्ति का रहस्य", "page": 55},
+            {"title": "अध्याय-10 - परमात्मा की विभूतियां", "page": 65},
+            {"title": "अध्याय-11 - विश्वरूप दर्शन", "page": 70},
+            {"title": "अध्याय-12 - ज्ञान प्राप्ति के बाद की भक्ति", "page": 76},
+            {"title": "अध्याय-13 - क्षेत्र तथा क्षेत्रज्ञ का विचार", "page": 83},
+            {"title": "अध्याय-14 - तीन गुणों का वर्गीकरण", "page": 94},
+            {"title": "अध्याय-15 - सर्वश्रेष्ठ पुरुषोत्तम", "page": 100},
+            {"title": "अध्याय-16 - दैवी तथा आसुरी सम्पदाएं", "page": 112},
+            {"title": "अध्याय-17 - श्रद्धा का वर्गीकरण", "page": 120},
+            {"title": "अध्याय-18 - सम्पूर्ण गीता रहस्य", "page": 130},
+        ],
     },
 ]
 PUSTAK_BY_ID = {b["id"]: b for b in PUSTAK_DEFS}
@@ -116,7 +171,32 @@ PODCAST_LINKS = [
 
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@%E0%A4%85%E0%A4%AE%E0%A5%83%E0%A4%A4%E0%A4%95%E0%A4%A3"
 YOUTUBE_CHANNEL_HANDLE = "@अमृतकण"
-YOUTUBE_VIDEO_IDS = ["8jccc3XVnkk", "lmKCjw8zdkw"]
+YOUTUBE_VIDEO_IDS = [
+    "JIuRONh3jbQ",
+    "lmKCjw8zdkw",
+    "KlgKiOQFWGQ",
+    "8jccc3XVnkk",
+    "ODX44wi006k",
+    "hqzbKpmaDF8",
+    "0VNthfGNRVQ",
+    "74GehrWEKjk",
+    "NYuYq9eif0I",
+    "zdlCJEwALYA",
+    "gosDFl6mFVY",
+    "vAGsHpnGinw",
+    "HoG-xkehc2I",
+    "rYUCzt-zAas",
+    "CDg6z0re0Oc",
+    "eH_eIFaToCM",
+    "jN3LWx9UhCg",
+    "zevkRTtp_WE",
+    "YzmK1ChCUB8",
+    "rujCW8wU-Hw",
+    "ShElf33mVHk",
+    "fm6R8z6ssdk",
+    "y-jUSSGgoR0",
+    "gbeBfdHrywE",
+]
 # Brand icon path + color sourced from simple-icons, same convention as PODCAST_LINKS above.
 YOUTUBE_ICON_PATH = "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
 YOUTUBE_ICON_COLOR = "#FF0000"
@@ -509,6 +589,7 @@ def api_pustake():
                 "author": b["author"],
                 "pageCount": page_count,
                 "thumbnailUrl": f"/pustak/{b['id']}/page/1.jpg" if page_count else "",
+                "chapters": b.get("chapters", []),
             }
         )
     return {"books": books}
@@ -634,6 +715,12 @@ class AudioHandler(http.server.BaseHTTPRequestHandler):
         if host == f"www.{PRIMARY_DOMAIN}":
             self.send_response(301)
             self.send_header("Location", f"https://{PRIMARY_DOMAIN}{self.path}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if self.headers.get("X-Forwarded-Proto") == "http":
+            self.send_response(301)
+            self.send_header("Location", f"https://{host}{self.path}")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return

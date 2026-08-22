@@ -24,6 +24,68 @@ body {
   transform: translateY(-4px);
 }
 
+/* पुस्तके cover: on hover, the page image fades back and the "read" badge
+   highlights to the brand accent, so the whole tile visibly responds to the
+   pointer instead of only the badge (matches antd's Card `hoverable`
+   convention of the cover dimming under its action affordance). */
+.pustak-cover-img {
+  transition: opacity 0.2s ease;
+}
+.tile-link:hover .pustak-cover-img {
+  opacity: 0.7;
+}
+.pustak-read-badge {
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+.tile-link:hover .pustak-read-badge {
+  background-color: #b5541a;
+  transform: scale(1.12);
+}
+
+/* यूट्यूब video carousel (VideoShelf in Home.tsx): a native horizontally
+   scrolling flexbox with CSS scroll-snap, not a JS carousel library — see
+   the comment on VideoShelf for why. Generous gap + vertical padding here
+   is the "breathing room around each video" the row needed; tile width
+   below is plain responsive CSS (no JS resize listener/breakpoint state
+   involved), correct from the very first paint at any width. */
+.yt-shelf {
+  display: flex;
+  gap: 28px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 12px 4px 20px;
+  flex: 1;
+  scrollbar-width: none;
+}
+.yt-shelf::-webkit-scrollbar {
+  display: none;
+}
+.yt-tile {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  width: 300px;
+}
+@media (max-width: 1200px) {
+  .yt-tile {
+    width: 260px;
+  }
+}
+@media (max-width: 900px) {
+  .yt-tile {
+    width: 240px;
+  }
+}
+@media (max-width: 600px) {
+  .yt-shelf {
+    gap: 20px;
+  }
+  .yt-tile {
+    width: 82vw;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;
